@@ -165,33 +165,83 @@ extendSession()
 - Patient search integration
 - Context switching
 
-### WebSocketContext
-**Purpose**: Real-time updates and notifications
+### WebSocketContext ✅ **Migrated to TypeScript**
+**Purpose**: Real-time updates and notifications with comprehensive type safety
 
 **Connection Management**:
-```javascript
-{
-  socket: WebSocket,
-  connected: boolean,
-  reconnecting: boolean,
-  messageQueue: []
+```typescript
+interface WebSocketState {
+  isConnected: boolean;
+  lastMessage: LastMessage | null;
+  subscriptions: Record<string, SubscriptionConfig>;
+  isOnline: boolean;
+  error: WebSocketError | null;
+  reconnectAttempts: number;
+  readyState: WebSocketReadyState;
+}
+
+enum WebSocketReadyState {
+  UNINSTANTIATED = -1,
+  CONNECTING = 0,
+  OPEN = 1,
+  CLOSING = 2,
+  CLOSED = 3,
 }
 ```
 
 **Real-time Features**:
-- Auto-reconnection
-- Message queuing
-- Event subscription
-- Heartbeat monitoring
-- Connection state
+- ✅ **Auto-reconnection** with exponential backoff
+- ✅ **Message queuing** with type-safe message structure
+- ✅ **Event subscription** with resource and patient filtering
+- ✅ **Heartbeat monitoring** with configurable ping/pong
+- ✅ **Connection state** management with detailed status
+- ✅ **Dual-mode authentication** (training/JWT)
+- ✅ **Error recovery** with detailed error categorization
 
-**Event Types**:
-```javascript
-// Real-time notifications
-PATIENT_UPDATED: 'patient.updated'
-LAB_RESULT_READY: 'lab.result.ready'
-MEDICATION_ALERT: 'medication.alert'
-SYSTEM_NOTIFICATION: 'system.notification'
+**Message Types**:
+```typescript
+type WebSocketMessageType = 
+  | 'subscribe' | 'unsubscribe' | 'authenticate' 
+  | 'ping' | 'pong' | 'update' | 'notification';
+
+interface WebSocketMessage {
+  type: WebSocketMessageType;
+  data?: any;
+  subscription_id?: string;
+  token?: string;
+  resource_types?: string[];
+  patient_ids?: string[];
+}
+```
+
+**Enhanced Context API**:
+```typescript
+interface WebSocketContextType {
+  // Core messaging
+  sendMessage: (message: WebSocketMessage) => boolean;
+  sendJsonMessage: (message: any) => boolean;
+  
+  // Subscription management
+  subscribe: (subscriptionId: string, resourceTypes?: string[], patientIds?: string[]) => boolean;
+  unsubscribe: (subscriptionId: string) => boolean;
+  
+  // Connection management
+  connect: () => void;
+  disconnect: () => void;
+  getWebSocket: () => WebSocket | null;
+  isConnectionReady: () => boolean;
+}
+```
+
+**Utility Hooks**:
+```typescript
+// Enhanced status hook
+const { 
+  isConnected, 
+  connectionStatus, 
+  isReady, 
+  error 
+} = useWebSocketStatus();
 ```
 
 ## Shared Patterns
