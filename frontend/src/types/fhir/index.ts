@@ -6,51 +6,101 @@
  */
 
 // Import core FHIR R4 types from @ahryman40k/ts-fhir-types
-export {
+import {
   // Core resources used in MedGenEMR
-  Patient,
-  Observation,
-  Condition,
-  MedicationRequest,
-  MedicationDispense,
-  AllergyIntolerance,
-  Immunization,
-  Procedure,
-  DiagnosticReport,
-  ServiceRequest,
-  Encounter,
-  CarePlan,
-  CareTeam,
-  DocumentReference,
-  ImagingStudy,
-  Practitioner,
-  Organization,
+  IPatient,
+  IObservation,
+  ICondition,
+  IMedicationRequest,
+  IMedicationDispense,
+  IAllergyIntolerance,
+  IImmunization,
+  IProcedure,
+  IDiagnosticReport,
+  IServiceRequest,
+  IEncounter,
+  ICarePlan,
+  ICareTeam,
+  IDocumentReference,
+  IImagingStudy,
+  IPractitioner,
+  IOrganization,
+  ICapabilityStatement,
+  ICoverage,
   
   // Bundle and search
-  Bundle,
-  BundleEntry,
+  IBundle,
+  IBundle_Entry,
+  BundleTypeKind,
+  Bundle_SearchModeKind,
   
   // Common data types
-  HumanName,
-  Address,
-  ContactPoint,
-  Identifier,
-  CodeableConcept,
-  Coding,
-  Quantity,
-  Period,
-  Reference,
-  Meta,
+  IHumanName,
+  IAddress,
+  IContactPoint,
+  IIdentifier,
+  ICodeableConcept,
+  ICoding,
+  IQuantity,
+  IPeriod,
+  IReference,
+  IMeta,
   
   // Base resource type
-  Resource,
-  DomainResource,
+  IResource,
+  IDomainResource,
+  IResourceList,
   
   // Operation outcomes
-  OperationOutcome,
-  OperationOutcomeIssue,
+  IOperationOutcome,
+  IOperationOutcome_Issue,
   
 } from '@ahryman40k/ts-fhir-types/lib/R4';
+
+// Re-export with cleaner type names for easier usage
+export type Patient = IPatient;
+export type Observation = IObservation;
+export type Condition = ICondition;
+export type MedicationRequest = IMedicationRequest;
+export type MedicationDispense = IMedicationDispense;
+export type AllergyIntolerance = IAllergyIntolerance;
+export type Immunization = IImmunization;
+export type Procedure = IProcedure;
+export type DiagnosticReport = IDiagnosticReport;
+export type ServiceRequest = IServiceRequest;
+export type Encounter = IEncounter;
+export type CarePlan = ICarePlan;
+export type CareTeam = ICareTeam;
+export type DocumentReference = IDocumentReference;
+export type ImagingStudy = IImagingStudy;
+export type Practitioner = IPractitioner;
+export type Organization = IOrganization;
+export type CapabilityStatement = ICapabilityStatement;
+export type Coverage = ICoverage;
+
+// Bundle and search types
+export type Bundle = IBundle;
+export type BundleEntry = IBundle_Entry;
+
+// Common data types
+export type HumanName = IHumanName;
+export type Address = IAddress;
+export type ContactPoint = IContactPoint;
+export type Identifier = IIdentifier;
+export type CodeableConcept = ICodeableConcept;
+export type Coding = ICoding;
+export type Quantity = IQuantity;
+export type Period = IPeriod;
+export type Reference = IReference;
+export type Meta = IMeta;
+
+// Base resource types
+export type Resource = IResource;
+export type DomainResource = IDomainResource;
+
+// Operation outcomes
+export type OperationOutcome = IOperationOutcome;
+export type OperationOutcomeIssue = IOperationOutcome_Issue;
 
 // Re-export R4 types for validation
 import * as R4 from '@ahryman40k/ts-fhir-types/lib/R4';
@@ -78,7 +128,8 @@ export type FHIRResourceType =
   | 'DocumentReference'
   | 'ImagingStudy'
   | 'Practitioner'
-  | 'Organization';
+  | 'Organization'
+  | 'Coverage';
 
 /**
  * Search parameters interface for FHIR API calls
@@ -102,7 +153,7 @@ export interface FHIRSearchParams {
 /**
  * Bundle types used in MedGenEMR
  */
-export type BundleType = 'searchset' | 'collection' | 'transaction' | 'batch';
+export type BundleType = BundleTypeKind;
 
 /**
  * FHIR API Response wrapper
@@ -117,7 +168,7 @@ export interface FHIRResponse<T = Resource> {
 /**
  * Bundle response with proper typing
  */
-export interface FHIRBundle extends Bundle {
+export interface FHIRBundle extends Omit<Bundle, 'type' | 'entry'> {
   resourceType: 'Bundle';
   type: BundleType;
   entry?: FHIRBundleEntry[];
@@ -125,11 +176,11 @@ export interface FHIRBundle extends Bundle {
   link?: BundleLink[];
 }
 
-export interface FHIRBundleEntry extends BundleEntry {
+export interface FHIRBundleEntry extends Omit<BundleEntry, 'resource'> {
   resource?: Resource;
   fullUrl?: string;
   search?: {
-    mode?: 'match' | 'include' | 'outcome';
+    mode?: Bundle_SearchModeKind;
     score?: number;
   };
 }
@@ -237,7 +288,7 @@ export function isBundle(resource: any): resource is Bundle {
  * Utility function to extract resource from bundle entry
  */
 export function extractResource<T extends Resource>(entry: BundleEntry): T | null {
-  return entry.resource as T || null;
+  return (entry.resource as unknown as T) || null;
 }
 
 /**
@@ -251,7 +302,7 @@ export function getResourcesByType<T extends Resource>(
   
   return bundle.entry
     .filter(entry => entry.resource?.resourceType === resourceType)
-    .map(entry => entry.resource as T)
+    .map(entry => entry.resource as unknown as T)
     .filter(Boolean);
 }
 
