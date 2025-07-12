@@ -1,28 +1,73 @@
 # Services Module
 
+**Status**: Active - TypeScript Migration In Progress  
+**Updated**: 2025-01-12
+
 ## Overview
-The Services Module provides the core business logic layer for MedGenEMR, encapsulating all API interactions, data transformations, and external service integrations. This module demonstrates clean architecture principles with clear separation of concerns.
+The Services Module provides the core business logic layer for MedGenEMR, encapsulating all API interactions, data transformations, and external service integrations. This module demonstrates clean architecture principles with clear separation of concerns and is being actively migrated to TypeScript for enhanced type safety.
 
 ## Architecture
 ```
 Services Module
-├── fhirService.js (Core FHIR operations)
-├── searchService.js (Clinical catalog search)
-├── pharmacyService.js (Medication workflows)
-├── dicomService.js (Medical imaging)
-├── authService.js (Authentication)
-├── cdsHooksClient.js (CDS Hooks integration)
-├── cdsHooksService.js (Custom hook management)
-├── websocket.js (Real-time updates)
-├── providerService.js (Provider management)
-├── vitalSignsService.js (Vital signs operations)
-└── api.js (Base HTTP client)
+├── fhirClient.ts ✅ (Core FHIR operations) - Migrated
+├── emrClient.ts ✅ (EMR-specific operations) - Migrated
+├── searchService.ts ✅ (Clinical catalog search) - Migrated
+├── websocket.ts ✅ (Real-time updates) - Migrated
+├── cdsHooksClient.ts ✅ (CDS Hooks integration) - Migrated
+├── fhirService.js ⏳ (Legacy - being replaced by fhirClient.ts)
+├── pharmacyService.js ⏳ (Medication workflows) - Pending
+├── dicomService.js ⏳ (Medical imaging) - Pending
+├── authService.js ⏳ (Authentication) - Pending
+├── cdsHooksService.js ⏳ (Custom hook management) - Pending
+├── providerService.js ⏳ (Provider management) - Pending
+└── vitalSignsService.js ⏳ (Vital signs operations) - Pending
 ```
+
+## TypeScript Migration Status
+
+| Service | Status | Migration Date | Key Improvements |
+|---------|--------|----------------|------------------|
+| fhirClient.ts | ✅ Migrated | 2025-01-12 | Full FHIR R4 type safety, generics |
+| emrClient.ts | ✅ Migrated | 2025-01-12 | Type-safe EMR operations |
+| searchService.ts | ✅ Migrated | 2025-01-12 | Typed search results, Map-based cache |
+| websocket.ts | ✅ Migrated | 2025-01-12 | Typed messages, auto-reconnection |
+| cdsHooksClient.ts | ✅ Migrated | 2025-01-12 | CDS Hooks 1.0/2.0 compliance |
+| Others | ⏳ Pending | - | Scheduled for migration |
 
 ## Core Services
 
-### fhirService.js
-**Purpose**: Centralized FHIR R4 API operations with caching and error handling
+### fhirClient.ts (TypeScript ✅)
+**Purpose**: Centralized FHIR R4 API operations with full type safety
+
+**TypeScript Features**:
+```typescript
+// Generic resource operations with type constraints
+class FHIRClient {
+  async getResource<T extends Resource>(
+    resourceType: T['resourceType'], 
+    id: string
+  ): Promise<T>
+  
+  async createResource<T extends Resource>(
+    resourceType: T['resourceType'], 
+    data: Partial<T>
+  ): Promise<T>
+  
+  async searchResources<T extends Resource>(
+    resourceType: T['resourceType'],
+    params?: FHIRSearchParams
+  ): Promise<Bundle<T>>
+}
+
+// Type-safe error handling
+export class FHIRError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public operationOutcome?: OperationOutcome
+  )
+}
+```
 
 **Key Methods**:
 ```javascript
@@ -53,8 +98,8 @@ getRecentEncounters(patientId)
 - Resource caching
 - Retry logic for failed requests
 
-### searchService.js
-**Purpose**: Clinical catalog search with multiple data sources
+### searchService.ts (TypeScript ✅)
+**Purpose**: Clinical catalog search with type-safe results and intelligent caching
 
 **Key Methods**:
 ```javascript
@@ -426,3 +471,57 @@ Services Module
 - Error scenario testing
 - Integration tests with backend
 - Performance benchmarks
+
+## Recent Updates
+
+### 2025-01-12 - TypeScript Migration Phase 2 Complete
+
+#### Migrated Services
+
+**fhirClient.ts** ✅
+- Generic resource operations with type constraints
+- Full FHIR R4 type safety using @ahryman40k/ts-fhir-types
+- Enhanced error handling with FHIRError class
+- Type-safe bundle operations
+- Axios interceptors with proper typing
+
+**emrClient.ts** ✅  
+- Type-safe EMR-specific operations
+- Capability detection interfaces
+- Workflow state management types
+- UI preferences with strict typing
+- Clinical context interfaces
+
+**searchService.ts** ✅
+- Comprehensive search result typing
+- Map-based caching for performance
+- Allergen category support
+- Type-safe search parameters
+- Unified result interfaces
+
+**websocket.ts** ✅
+- Strongly typed WebSocket messages
+- Auto-reconnection with exponential backoff
+- Subscription management interfaces
+- Message queue for offline support
+- Connection state tracking
+
+**cdsHooksClient.ts** ✅
+- CDS Hooks 1.0 and 2.0 compliance
+- Complete type definitions for all hook types
+- Service discovery interfaces
+- Prefetch template support
+- SMART authorization types
+
+### Migration Benefits
+- **Type Safety**: Compile-time error detection
+- **IntelliSense**: Full autocomplete support
+- **Documentation**: Types serve as documentation
+- **Refactoring**: Safe refactoring with compiler help
+- **Error Prevention**: Catch issues before runtime
+
+### Next Steps
+- Migrate remaining service files
+- Update all consumers to use new TypeScript services
+- Add comprehensive unit tests
+- Create service composition patterns
