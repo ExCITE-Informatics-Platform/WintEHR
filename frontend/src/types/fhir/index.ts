@@ -28,6 +28,13 @@ import {
   ICapabilityStatement,
   ICoverage,
   
+  // Additional resources for workflow context
+  IGoal,
+  ITask,
+  IMeasure,
+  IMeasureReport,
+  IGroup,
+  
   // Bundle and search
   IBundle,
   IBundle_Entry,
@@ -77,6 +84,13 @@ export type Practitioner = IPractitioner;
 export type Organization = IOrganization;
 export type CapabilityStatement = ICapabilityStatement;
 export type Coverage = ICoverage;
+
+// Additional workflow resources
+export type Goal = IGoal;
+export type Task = ITask;
+export type Measure = IMeasure;
+export type MeasureReport = IMeasureReport;
+export type Group = IGroup;
 
 // Bundle and search types
 export type Bundle = IBundle;
@@ -129,7 +143,12 @@ export type FHIRResourceType =
   | 'ImagingStudy'
   | 'Practitioner'
   | 'Organization'
-  | 'Coverage';
+  | 'Coverage'
+  | 'Goal'
+  | 'Task'
+  | 'Measure'
+  | 'MeasureReport'
+  | 'Group';
 
 /**
  * Search parameters interface for FHIR API calls
