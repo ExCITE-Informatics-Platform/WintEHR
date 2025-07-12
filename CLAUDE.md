@@ -1,11 +1,12 @@
 # CLAUDE.md - MedGenEMR Developer Guide
 
-**Status**: Production-Ready FHIR-Native EMR  
+**Status**: Production-Ready FHIR-Native EMR - TypeScript Migration In Progress  
 **Stack**: React 18 + FastAPI + PostgreSQL + Docker  
 **Architecture**: Event-Driven with Real-Time Integration  
 **Standards**: FHIR R4, CDS Hooks 1.0, DICOM  
 **Data**: 20,115+ Synthea Resources, 10+ Patients  
-**Updated**: 2025-01-08
+**Updated**: 2025-01-12  
+**Current Branch**: typescript-migration-redesign
 
 ## 🎯 What This System Is
 
@@ -42,6 +43,36 @@ export JWT_ENABLED=true   # Production JWT mode
 # Data management
 cd backend && python scripts/synthea_master.py full --count 10
 ```
+
+## 🔄 TypeScript Migration (Active)
+
+**Branch**: `typescript-migration-redesign`  
+**Progress**: Phase 1 - Foundation & Setup  
+**Documentation**: See `docs/typescript-migration/` for detailed plans
+
+### Migration Overview
+- **Total JS Files**: 202 in frontend/src
+- **Migration Method**: Phased approach, critical files first
+- **Type System**: @ahryman40k/ts-fhir-types for FHIR R4
+- **Build Tool**: Migrating from CRA to Vite
+
+### Critical Migration Tasks
+1. **Always check documentation first**: 
+   - Review module docs in `docs/modules/`
+   - Consult https://www.hl7.org/fhir/R4/
+   - Check https://cds-hooks.hl7.org/
+   - Use `context7` for latest library docs
+
+2. **Follow migration patterns**:
+   - See `docs/typescript-migration/detailed-migration-plan.md`
+   - Use pre-task documentation review
+   - Implement with strict types
+   - Post-task code verification
+
+3. **Key Resources**:
+   - Migration Tracker: `docs/typescript-migration/migration-tracker.md`
+   - Detailed Plan: `docs/typescript-migration/detailed-migration-plan.md`
+   - Type Patterns: Follow established patterns in migrated files
 
 ## ⛔ Critical Development Rules
 
