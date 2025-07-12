@@ -14,7 +14,7 @@ The Utils module provides essential utility functions for the MedGenEMR frontend
 frontend/src/utils/
 ├── fhirFormatters.ts       # FHIR data formatting utilities ✅ (Migrated)
 ├── fhirValidation.ts       # FHIR resource validation ✅ (Migrated)  
-├── intelligentCache.js     # Multi-level caching system
+├── intelligentCache.ts     # Multi-level caching system ✅ (Migrated)
 ├── exportUtils.js          # Data export functionality
 ├── printUtils.js           # Clinical document printing
 ├── performanceMonitor.js   # Performance monitoring
@@ -31,7 +31,7 @@ frontend/src/utils/
 |------|--------|----------------|-------------|
 | fhirFormatters.ts | ✅ Migrated | 2025-01-12 | Added 4 new functions, comprehensive type safety |
 | fhirValidation.ts | ✅ Migrated | 2025-01-12 | Strongly typed validation classes, 153 FHIR types |
-| intelligentCache.js | ⏳ Pending | - | Multi-level cache with TTL |
+| intelligentCache.ts | ✅ Migrated | 2025-01-12 | Type-safe cache with generic operations, TTL enums |
 | exportUtils.js | ⏳ Pending | - | CSV/JSON/PDF export |
 | Others | ⏳ Pending | - | Lower priority utilities |
 
@@ -120,32 +120,72 @@ export const VALIDATION_PATTERNS: {
 - Comprehensive type guards
 - Proper error class inheritance
 
-### 3. Intelligent Cache (`intelligentCache.js`) ⏳
+### 3. Intelligent Cache (`intelligentCache.ts`) ✅
 
-**Purpose**: Multi-level caching system with TTL and size limits
+**Purpose**: Type-safe multi-level caching system with TTL and size limits
 
-**Key Features**:
-- Memory cache with configurable TTL
-- Size-based eviction policies
-- Cache statistics and monitoring
-- Batch operations support
+**TypeScript Features**:
+```typescript
+// Enum-based priority system
+export enum CachePriority {
+  CRITICAL = 'critical',   // 30 minutes
+  IMPORTANT = 'important', // 15 minutes  
+  NORMAL = 'normal',       // 10 minutes
+  LOW = 'low'             // 5 minutes
+}
+
+// Generic cache operations
+class IntelligentCache {
+  set<T = any>(key: CacheKey, data: T, options?: CacheSetOptions): CacheEntry<T>
+  get<T = any>(key: CacheKey): T | null
+  has(key: CacheKey): boolean
+  clearPatient(patientId: string): number
+  clearResourceType(resourceType: FHIRResourceType): number
+  getStats(): CacheStats
+}
+
+// Type-safe cache entry
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+  expiresAt: number;
+  priority: CachePriority;
+  resourceType?: FHIRResourceType;
+  tags: string[];
+  accessCount: number;
+  lastAccessed: number;
+}
+```
 
 **Usage**:
-```javascript
-import { IntelligentCache } from '../utils/intelligentCache';
+```typescript
+import { intelligentCache, CachePriority, cacheUtils } from '../utils/intelligentCache';
 
-const cache = new IntelligentCache({
-  maxSize: 1000,
-  defaultTTL: 600000, // 10 minutes
-  evictionPolicy: 'lru'
+// Type-safe cache operations
+const patientData = intelligentCache.get<Patient>('patient:123');
+
+// Set with FHIR resource type detection
+intelligentCache.set('obs:456', observation, {
+  resourceType: 'Observation',
+  priority: CachePriority.NORMAL
 });
 
-// Set with custom TTL
-cache.set('key', data, { ttl: 300000 });
+// Generate type-safe cache keys
+const key = cacheUtils.patientResourceKey('123', 'Condition', { status: 'active' });
 
-// Get with fallback
-const data = cache.get('key', fetchFromServer);
+// Get detailed statistics
+const stats = intelligentCache.getStats();
+console.log(`Hit rate: ${stats.hitRate}%`);
 ```
+
+**Key Features**:
+- Automatic TTL based on FHIR resource type
+- Type-safe cache keys with template literals
+- Generic cache operations
+- Priority-based eviction policies
+- Comprehensive statistics tracking
+- Patient-centric cache clearing
 
 ### 4. Export Utils (`exportUtils.js`) ⏳
 
@@ -354,5 +394,11 @@ test('validateResource catches missing required fields', () => {
   - Strongly typed validation classes
   - All 153 FHIR R4 resource types
   - Enhanced error handling with stack traces
+- ✅ Migrated `intelligentCache.js` to TypeScript
+  - Enum-based priority system with type safety
+  - Generic cache operations with proper typing
+  - Type-safe cache key generation utilities
+  - Enhanced statistics tracking interfaces
+  - FHIR resource-specific caching strategies
 - 📋 Created comprehensive utils module documentation
-- 🎯 Next: Migrate `intelligentCache.js` and `exportUtils.js`
+- 🎯 Next: Migrate `exportUtils.js` and remaining utilities
