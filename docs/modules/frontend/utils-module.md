@@ -187,29 +187,85 @@ console.log(`Hit rate: ${stats.hitRate}%`);
 - Comprehensive statistics tracking
 - Patient-centric cache clearing
 
-### 4. Export Utils (`exportUtils.js`) ⏳
+### 4. Export Utils (`exportUtils.ts`) ✅
 
-**Purpose**: Export clinical data in multiple formats
+**Purpose**: Export clinical data in multiple formats with comprehensive type safety
+**Status**: ✅ TypeScript (Phase 4.4 Complete)
 
 **Supported Formats**:
-- CSV with customizable columns
-- JSON with FHIR structure
-- PDF with clinical formatting
-- Excel worksheets
+- CSV with type-safe customizable columns
+- JSON with complete FHIR structure preservation
+- PDF with clinical formatting and HTML escaping
+- Batch exports for multiple data types
 
-**Usage**:
-```javascript
-import { exportClinicalData, EXPORT_COLUMNS } from '../utils/exportUtils';
+**TypeScript Implementation**:
+```typescript
+// Comprehensive type definitions
+export interface ExportOptions<T = any> {
+  patient?: Patient;
+  data: T[];
+  columns?: ExportColumn<T>[];
+  format: ExportFormat;
+  title: string;
+  formatForPrint?: (data: T[]) => string;
+  includeTimestamp?: boolean;
+  customFilename?: string;
+}
 
-exportClinicalData({
-  patient: currentPatient,
+export interface BatchExportOptions {
+  patient: Patient;
+  exports: Array<{
+    data: any[];
+    type: ExportColumnType;
+    title: string;
+  }>;
+  format: ExportFormat;
+  combinedFilename?: string;
+}
+
+// Type-safe export functions
+export const exportClinicalData = <T = any>(options: ExportOptions<T>): void
+export const batchExportClinicalData = (options: BatchExportOptions): void
+export const generateCSV = <T = any>(data: T[], columns: ExportColumn<T>[]): string
+export const downloadCSV = <T = any>(data: T[], columns: ExportColumn<T>[], filename: string): void
+export const downloadJSON = <T = any>(data: T, filename: string): void
+```
+
+**Enhanced Usage**:
+```typescript
+import { exportClinicalData, EXPORT_COLUMNS, batchExportClinicalData } from '../utils/exportUtils';
+import { Patient, Observation, Condition } from '../types/fhir';
+
+// Single resource type export
+exportClinicalData<Observation>({
+  patient: currentPatient as Patient,
   data: observations,
   columns: EXPORT_COLUMNS.observations,
   format: 'csv',
   title: 'Lab Results',
-  formatForPrint: formatObservationsForPrint
+  includeTimestamp: true
+});
+
+// Batch export multiple types
+batchExportClinicalData({
+  patient: currentPatient,
+  exports: [
+    { data: conditions, type: 'conditions', title: 'Active Problems' },
+    { data: medications, type: 'medications', title: 'Current Medications' },
+    { data: allergies, type: 'allergies', title: 'Known Allergies' }
+  ],
+  format: 'json'
 });
 ```
+
+**Key Features**:
+- Complete type safety with generic constraints
+- FHIR Patient resource integration
+- Automated filename generation with timestamps
+- Proper file cleanup and blob management
+- HTML escaping for secure PDF generation
+- Template literal types for export format validation
+- Backward compatibility with existing JavaScript code
 
 ### 5. Print Utils (`printUtils.js`)
 
@@ -385,20 +441,23 @@ test('validateResource catches missing required fields', () => {
 
 ## Recent Updates
 
-### 2025-01-12
-- ✅ Migrated `fhirFormatters.js` to TypeScript
-  - Added 4 new utility functions
-  - Implemented comprehensive type guards
-  - Enhanced date formatting options
-- ✅ Migrated `fhirValidation.js` to TypeScript
-  - Strongly typed validation classes
-  - All 153 FHIR R4 resource types
-  - Enhanced error handling with stack traces
-- ✅ Migrated `intelligentCache.js` to TypeScript
-  - Enum-based priority system with type safety
-  - Generic cache operations with proper typing
-  - Type-safe cache key generation utilities
-  - Enhanced statistics tracking interfaces
+### 2025-07-12
+- ✅ **Phase 4.4 Complete**: Migrated `exportUtils.js` to TypeScript
+  - Comprehensive type safety for all export operations
+  - Generic functions with type constraints for data-column compatibility  
+  - Enhanced batch export functionality with type validation
+  - Template literal types for export format validation
+  - Type-safe FHIR Patient resource integration
+  - HTML escaping for secure PDF generation
+  - Proper file cleanup and blob management
+  - Backward API compatibility maintained
+
+### 2025-01-12  
+- ✅ **Phase 4.1-4.3 Complete**: Core utils migration
+  - Migrated `fhirFormatters.js` to TypeScript with 17 total functions
+  - Migrated `fhirValidation.js` to TypeScript with 153 FHIR R4 resource types
+  - Migrated `intelligentCache.js` to TypeScript with enum-based priority system
+  - Added comprehensive type guards and error handling
+  - Enhanced date formatting and age calculation utilities
   - FHIR resource-specific caching strategies
-- 📋 Created comprehensive utils module documentation
-- 🎯 Next: Migrate `exportUtils.js` and remaining utilities
+- 📋 Created comprehensive utils module documentation with migration tracking
