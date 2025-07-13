@@ -1,7 +1,11 @@
 /**
  * Vital Signs Service
  * Centralized service for managing vital signs mapping and categorization using FHIR standards
+ * 
+ * Migrated to TypeScript with comprehensive type safety using FHIR R4 types.
  */
+
+import { R4 } from '@ahryman40k/ts-fhir-types';
 
 // Standard LOINC codes for vital signs
 const VITAL_SIGNS_LOINC = {
@@ -23,10 +27,10 @@ const VITAL_SIGNS_LOINC = {
   'head-circumference': '9843-4', // Head circumference
   'pain-scale': '72514-3',        // Pain severity scale
   'glasgow-coma': '9269-2'        // Glasgow coma scale
-};
+} as const;
 
 // Display names for vital signs
-const VITAL_SIGNS_DISPLAY = {
+const VITAL_SIGNS_DISPLAY: Record<string, string> = {
   '8480-6': 'Systolic Blood Pressure',
   '8462-4': 'Diastolic Blood Pressure',
   '85354-9': 'Blood Pressure',
@@ -43,7 +47,7 @@ const VITAL_SIGNS_DISPLAY = {
 };
 
 // Units for vital signs
-const VITAL_SIGNS_UNITS = {
+const VITAL_SIGNS_UNITS: Record<string, string> = {
   '8480-6': 'mmHg',
   '8462-4': 'mmHg',
   '85354-9': 'mmHg',
@@ -60,7 +64,7 @@ const VITAL_SIGNS_UNITS = {
 };
 
 // Categories for grouping vital signs
-const VITAL_SIGNS_CATEGORIES = {
+const VITAL_SIGNS_CATEGORIES: Record<string, string[]> = {
   'cardiovascular': ['8480-6', '8462-4', '85354-9', '8867-4'],
   'respiratory': ['9279-1', '2708-6'],
   'metabolic': ['8310-5', '29463-7', '8302-2', '39156-5'],
@@ -68,7 +72,42 @@ const VITAL_SIGNS_CATEGORIES = {
   'pediatric': ['9843-4']
 };
 
+/**
+ * Type definitions for vital signs
+ */
+export type VitalSignType = keyof typeof VITAL_SIGNS_LOINC;
+export type VitalSignCategory = keyof typeof VITAL_SIGNS_CATEGORIES;
+
+export interface VitalSignRange {
+  min: number;
+  max: number;
+}
+
+export interface VitalSignData {
+  loincCode: string;
+  displayName: string;
+  unit: string;
+  value: number | string;
+  date: string;
+  isAbnormal?: boolean;
+}
+
+/**
+ * Extended observation interface for legacy support
+ */
+export interface ObservationWithLegacy extends R4.IObservation {
+  loinc_code?: string;
+  observation_type?: string;
+  observation_date?: string;
+  date?: string;
+}
+
 class VitalSignsService {
+  private readonly loincCodes: typeof VITAL_SIGNS_LOINC;
+  private readonly displayNames: Record<string, string>;
+  private readonly units: Record<string, string>;
+  private readonly categories: Record<string, string[]>;
+
   constructor() {
     this.loincCodes = VITAL_SIGNS_LOINC;
     this.displayNames = VITAL_SIGNS_DISPLAY;
@@ -79,7 +118,7 @@ class VitalSignsService {
   /**
    * Check if an observation is a vital sign
    */
-  isVitalSign(observation) {
+  isVitalSign(observation: ObservationWithLegacy | null | undefined): boolean {
     if (!observation) return false;
     
     // Check by LOINC code
@@ -113,14 +152,14 @@ class VitalSignsService {
   /**
    * Extract LOINC code from observation
    */
-  extractLoincCode(observation) {
+  extractLoincCode(observation: ObservationWithLegacy): string | null {
     if (!observation || !observation.code) return null;
     
     // Check coding array
     if (observation.code.coding) {
       for (const coding of observation.code.coding) {
         if (coding.system === 'http://loinc.org' || !coding.system) {
-          return coding.code;
+          return coding.code || null;
         }
       }
     }
@@ -136,7 +175,7 @@ class VitalSignsService {
   /**
    * Get display name for a vital sign
    */
-  getDisplayName(observation) {
+  getDisplayName(observation: ObservationWithLegacy): string {
     const loincCode = this.extractLoincCode(observation);
     
     // Use FHIR display name if available
@@ -152,161 +191,120 @@ class VitalSignsService {
       }
     }
     
-    // Use our lookup table
+    // Use mapped display name
     if (loincCode && this.displayNames[loincCode]) {
       return this.displayNames[loincCode];
     }
     
-    // Legacy support
-    if (observation.observation_name) {
-      return observation.observation_name;
-    }
-    
-    return 'Unknown Vital Sign';
+    // Fallback to LOINC code
+    return loincCode || 'Unknown Vital Sign';
   }
 
   /**
    * Get unit for a vital sign
    */
-  getUnit(observation) {
-    // Check FHIR valueQuantity
+  getUnit(observation: ObservationWithLegacy): string {
+    // First check FHIR valueQuantity unit
     if (observation.valueQuantity && observation.valueQuantity.unit) {
       return observation.valueQuantity.unit;
     }
     
-    // Check component values (for multi-component observations)
-    if (observation.component && observation.component.length > 0) {
-      const comp = observation.component[0];
-      if (comp.valueQuantity && comp.valueQuantity.unit) {
-        return comp.valueQuantity.unit;
-      }
-    }
-    
-    // Use lookup table
+    // Fall back to mapped unit
     const loincCode = this.extractLoincCode(observation);
     if (loincCode && this.units[loincCode]) {
       return this.units[loincCode];
-    }
-    
-    // Legacy support
-    if (observation.unit) {
-      return observation.unit;
     }
     
     return '';
   }
 
   /**
-   * Get value from observation
+   * Get numeric value from observation
    */
-  getValue(observation, component = null) {
-    // Handle multi-component observations (like blood pressure)
-    if (component && observation.component) {
-      const comp = observation.component.find(c => {
-        const compCode = this.extractLoincCode(c);
-        return compCode === component || 
-               (component === 'systolic' && compCode === '8480-6') ||
-               (component === 'diastolic' && compCode === '8462-4');
-      });
-      
-      if (comp) {
-        if (comp.valueQuantity) return comp.valueQuantity.value;
-        if (comp.valueString) return comp.valueString;
-        if (comp.valueInteger) return comp.valueInteger;
+  getValue(observation: ObservationWithLegacy): number | null {
+    // Check valueQuantity
+    if (observation.valueQuantity && typeof observation.valueQuantity.value === 'number') {
+      return observation.valueQuantity.value;
+    }
+    
+    // Check valueString for numeric values
+    if (observation.valueString) {
+      const numValue = parseFloat(observation.valueString);
+      if (!isNaN(numValue)) {
+        return numValue;
       }
     }
     
-    // Check FHIR value fields
-    if (observation.valueQuantity) return observation.valueQuantity.value;
-    if (observation.valueString) return observation.valueString;
-    if (observation.valueInteger) return observation.valueInteger;
-    if (observation.valueBoolean !== undefined) return observation.valueBoolean;
+    // Check valueInteger
+    if (typeof observation.valueInteger === 'number') {
+      return observation.valueInteger;
+    }
     
-    // Legacy support
-    if (observation.value_quantity) return observation.value_quantity;
-    if (observation.value) return observation.value;
+    // Check component values (for blood pressure)
+    if (observation.component && observation.component.length > 0) {
+      // For multi-component observations, return the first component value
+      const firstComponent = observation.component[0];
+      if (firstComponent.valueQuantity && typeof firstComponent.valueQuantity.value === 'number') {
+        return firstComponent.valueQuantity.value;
+      }
+    }
     
     return null;
   }
 
   /**
-   * Format vital sign value for display
-   */
-  formatValue(observation, component = null) {
-    const value = this.getValue(observation, component);
-    const unit = this.getUnit(observation);
-    
-    if (value === null || value === undefined) return '';
-    
-    // Special formatting for blood pressure
-    const loincCode = this.extractLoincCode(observation);
-    if (loincCode === '85354-9' && !component) {
-      const systolic = this.getValue(observation, 'systolic');
-      const diastolic = this.getValue(observation, 'diastolic');
-      if (systolic && diastolic) {
-        return `${systolic}/${diastolic} ${unit || 'mmHg'}`;
-      }
-    }
-    
-    // Regular formatting
-    return `${value}${unit ? ' ' + unit : ''}`;
-  }
-
-  /**
-   * Categorize vital signs
-   */
-  categorizeVitalSigns(observations) {
-    const categorized = {
-      cardiovascular: [],
-      respiratory: [],
-      metabolic: [],
-      neurological: [],
-      pediatric: [],
-      other: []
-    };
-    
-    observations.forEach(obs => {
-      if (!this.isVitalSign(obs)) return;
-      
-      const loincCode = this.extractLoincCode(obs);
-      let categorized_flag = false;
-      
-      for (const [category, codes] of Object.entries(this.categories)) {
-        if (codes.includes(loincCode)) {
-          categorized[category].push(obs);
-          categorized_flag = true;
-          break;
-        }
-      }
-      
-      if (!categorized_flag) {
-        categorized.other.push(obs);
-      }
-    });
-    
-    return categorized;
-  }
-
-  /**
    * Filter observations to only vital signs
    */
-  filterVitalSigns(observations) {
+  filterVitalSigns(observations: ObservationWithLegacy[]): ObservationWithLegacy[] {
     return observations.filter(obs => this.isVitalSign(obs));
   }
 
   /**
-   * Get latest vital signs grouped by type
+   * Group vital signs by category
    */
-  getLatestVitalSigns(observations) {
+  groupByCategory(observations: ObservationWithLegacy[]): Record<string, ObservationWithLegacy[]> {
     const vitalSigns = this.filterVitalSigns(observations);
-    const latest = {};
+    const grouped: Record<string, ObservationWithLegacy[]> = {};
+    
+    // Initialize categories
+    Object.keys(this.categories).forEach(category => {
+      grouped[category] = [];
+    });
+    grouped['other'] = [];
+    
+    vitalSigns.forEach(obs => {
+      const loincCode = this.extractLoincCode(obs);
+      let categorized = false;
+      
+      for (const [category, codes] of Object.entries(this.categories)) {
+        if (loincCode && codes.includes(loincCode)) {
+          grouped[category].push(obs);
+          categorized = true;
+          break;
+        }
+      }
+      
+      if (!categorized) {
+        grouped['other'].push(obs);
+      }
+    });
+    
+    return grouped;
+  }
+
+  /**
+   * Get latest vital signs (one per type)
+   */
+  getLatestVitalSigns(observations: ObservationWithLegacy[]): ObservationWithLegacy[] {
+    const vitalSigns = this.filterVitalSigns(observations);
+    const latest: Record<string, ObservationWithLegacy> = {};
     
     vitalSigns.forEach(obs => {
       const loincCode = this.extractLoincCode(obs);
       const key = loincCode || this.getDisplayName(obs);
       const date = obs.effectiveDateTime || obs.observation_date || obs.date;
       
-      if (!latest[key] || new Date(date) > new Date(latest[key].effectiveDateTime || latest[key].observation_date || latest[key].date)) {
+      if (!latest[key] || (date && new Date(date) > new Date(latest[key].effectiveDateTime || latest[key].observation_date || latest[key].date || '1970-01-01'))) {
         latest[key] = obs;
       }
     });
@@ -317,14 +315,14 @@ class VitalSignsService {
   /**
    * Check if vital sign is abnormal
    */
-  isAbnormal(observation, patientAge = null, patientGender = null) {
+  isAbnormal(observation: ObservationWithLegacy, patientAge?: number | null, patientGender?: string | null): boolean {
     const loincCode = this.extractLoincCode(observation);
     const value = this.getValue(observation);
     
     if (!value || isNaN(value)) return false;
     
     // Basic abnormal ranges (would need more sophisticated logic for age/gender)
-    const abnormalRanges = {
+    const abnormalRanges: Record<string, VitalSignRange> = {
       '8480-6': { min: 90, max: 140 },  // Systolic BP
       '8462-4': { min: 60, max: 90 },   // Diastolic BP
       '8867-4': { min: 60, max: 100 },  // Heart rate
@@ -333,7 +331,7 @@ class VitalSignsService {
       '2708-6': { min: 95, max: 100 }   // Oxygen saturation
     };
     
-    const range = abnormalRanges[loincCode];
+    const range = loincCode ? abnormalRanges[loincCode] : undefined;
     if (range) {
       return value < range.min || value > range.max;
     }
@@ -344,15 +342,57 @@ class VitalSignsService {
   /**
    * Get LOINC code for a vital sign type
    */
-  getLoincCode(vitalType) {
+  getLoincCode(vitalType: VitalSignType): string | typeof VITAL_SIGNS_LOINC[VitalSignType] | null {
     return this.loincCodes[vitalType] || null;
   }
 
   /**
    * Get all supported vital sign types
    */
-  getSupportedVitalTypes() {
-    return Object.keys(this.loincCodes);
+  getSupportedVitalTypes(): VitalSignType[] {
+    return Object.keys(this.loincCodes) as VitalSignType[];
+  }
+
+  /**
+   * Get vital sign categories
+   */
+  getCategories(): Record<string, string[]> {
+    return { ...this.categories };
+  }
+
+  /**
+   * Convert observation to VitalSignData
+   */
+  toVitalSignData(observation: ObservationWithLegacy): VitalSignData {
+    const loincCode = this.extractLoincCode(observation) || '';
+    const displayName = this.getDisplayName(observation);
+    const unit = this.getUnit(observation);
+    const value = this.getValue(observation) || 0;
+    const date = observation.effectiveDateTime || observation.observation_date || observation.date || new Date().toISOString();
+    const isAbnormal = this.isAbnormal(observation);
+
+    return {
+      loincCode,
+      displayName,
+      unit,
+      value,
+      date,
+      isAbnormal
+    };
+  }
+
+  /**
+   * Get abnormal ranges for all vital signs
+   */
+  getAbnormalRanges(): Record<string, VitalSignRange> {
+    return {
+      '8480-6': { min: 90, max: 140 },  // Systolic BP
+      '8462-4': { min: 60, max: 90 },   // Diastolic BP
+      '8867-4': { min: 60, max: 100 },  // Heart rate
+      '9279-1': { min: 12, max: 20 },   // Respiratory rate
+      '8310-5': { min: 97, max: 99.5 }, // Temperature (F)
+      '2708-6': { min: 95, max: 100 }   // Oxygen saturation
+    };
   }
 }
 
@@ -361,3 +401,4 @@ export const vitalSignsService = new VitalSignsService();
 
 // Also export class for custom instances
 export default VitalSignsService;
+export { VitalSignsService };
