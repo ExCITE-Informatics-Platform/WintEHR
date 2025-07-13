@@ -1,8 +1,11 @@
 /**
  * Encounters Tab Component
  * Display and manage patient encounters
+ * 
+ * Migrated to TypeScript with comprehensive type safety for encounter management.
  */
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -32,7 +35,11 @@ import {
   Alert,
   useTheme,
   alpha,
-  Snackbar
+  Snackbar,
+  SxProps,
+  Theme,
+  SelectChangeEvent,
+  AlertColor,
 } from '@mui/material';
 import {
   Timeline,
@@ -41,7 +48,7 @@ import {
   TimelineConnector,
   TimelineContent,
   TimelineDot,
-  TimelineOppositeContent
+  TimelineOppositeContent,
 } from '@mui/lab';
 import {
   EventNote as EncounterIcon,
@@ -58,9 +65,11 @@ import {
   Print as PrintIcon,
   CalendarMonth as CalendarIcon,
   AccessTime as TimeIcon,
-  Person as ProviderIcon
+  Person as ProviderIcon,
+  GetApp as ExportIcon,
 } from '@mui/icons-material';
 import { format, parseISO, isWithinInterval, subMonths } from 'date-fns';
+import { Encounter, Patient } from '@ahryman40k/ts-fhir-types/lib/R4';
 import { useFHIRResource } from '../../../../contexts/FHIRResourceContext';
 import { useNavigate } from 'react-router-dom';
 import EncounterSummaryDialog from '../dialogs/EncounterSummaryDialog';
@@ -70,11 +79,104 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import { printDocument, formatEncountersForPrint } from '../../../../utils/printUtils';
 import { exportClinicalData, EXPORT_COLUMNS } from '../../../../utils/exportUtils';
-import { GetApp as ExportIcon } from '@mui/icons-material';
 
-// Get encounter icon based on class
-const getEncounterIcon = (encounterClass) => {
-  switch (encounterClass?.code) {
+/**
+ * Type definitions for EncountersTab component
+ */
+export type EncounterStatus = 'planned' | 'arrived' | 'triaged' | 'in-progress' | 'onleave' | 'finished' | 'cancelled' | 'entered-in-error' | 'unknown';
+
+export type EncounterClass = 'AMB' | 'IMP' | 'EMER' | 'HH' | 'ACUTE' | 'NONAC';
+
+export type ViewMode = 'cards' | 'timeline';
+
+export type FilterPeriod = 'all' | '1m' | '3m' | '6m' | '1y';
+
+export type ExportFormat = 'csv' | 'json' | 'pdf';
+
+export interface EncounterCardProps {
+  encounter: Encounter;
+  onViewDetails: () => void;
+  onEdit: () => void;
+}
+
+export interface NewEncounterData {
+  type: EncounterClass;
+  reasonForVisit: string;
+  provider: string;
+  startDate: string;
+  startTime: string;
+}
+
+export interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: AlertColor;
+}
+
+export interface PatientInfo {
+  name: string;
+  mrn: string;
+  birthDate?: string;
+  gender?: string;
+  phone?: string;
+}
+
+export interface EncountersTabProps {
+  patientId: string;
+  onNotificationUpdate?: (message: string, severity: AlertColor) => void;
+  sx?: SxProps<Theme>;
+}
+
+export interface EncounterParticipant {
+  type?: Array<{
+    coding?: Array<{
+      system?: string;
+      code?: string;
+      display?: string;
+    }>;
+  }>;
+  individual?: {
+    reference?: string;
+    display?: string;
+  };
+}
+
+export interface EncounterClass {
+  system?: string;
+  code?: string;
+  display?: string;
+}
+
+export interface EncounterType {
+  coding?: Array<{
+    system?: string;
+    code?: string;
+    display?: string;
+  }>;
+  text?: string;
+}
+
+export interface EncounterPeriod {
+  start?: string;
+  end?: string;
+}
+
+export interface ReasonCode {
+  coding?: Array<{
+    system?: string;
+    code?: string;
+    display?: string;
+  }>;
+  text?: string;
+}
+
+/**
+ * Helper functions
+ */
+const getEncounterIcon = (encounterClass?: EncounterClass): React.ReactElement => {
+  const classCode = typeof encounterClass === 'object' ? encounterClass?.code : encounterClass;
+  
+  switch (classCode) {
     case 'IMP':
     case 'ACUTE':
       return <HospitalIcon color="error" />;
@@ -88,35 +190,107 @@ const getEncounterIcon = (encounterClass) => {
   }
 };
 
-// Get encounter type label
-const getEncounterTypeLabel = (encounter) => {
+const getEncounterTypeLabel = (encounter: Encounter): string => {
   return encounter.type?.[0]?.text || 
          encounter.type?.[0]?.coding?.[0]?.display || 
          encounter.class?.display ||
          'Encounter';
 };
 
-// Encounter Card Component
-const EncounterCard = ({ encounter, onViewDetails, onEdit }) => {
+const getStatusColor = (status?: EncounterStatus): 'success' | 'warning' | 'error' | 'default' => {
+  switch (status) {
+    case 'finished': return 'success';
+    case 'in-progress': return 'warning';
+    case 'cancelled': return 'error';
+    default: return 'default';
+  }
+};
+
+const createDefaultNewEncounterData = (): NewEncounterData => ({
+  type: 'AMB',
+  reasonForVisit: '',
+  provider: '',
+  startDate: new Date().toISOString().split('T')[0],
+  startTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
+});
+
+const createEncounterResource = (data: NewEncounterData, patientId: string): Encounter => ({
+  resourceType: 'Encounter',
+  status: 'in-progress',
+  class: {
+    system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
+    code: data.type,
+    display: data.type === 'AMB' ? 'ambulatory' : 
+            data.type === 'IMP' ? 'inpatient' : 
+            data.type === 'EMER' ? 'emergency' : 'ambulatory',
+  },
+  type: [{
+    text: 'Office Visit',
+  }],
+  subject: {
+    reference: `Patient/${patientId}`,
+  },
+  period: {
+    start: `${data.startDate}T${data.startTime}:00`,
+  },
+  reasonCode: data.reasonForVisit ? [{
+    text: data.reasonForVisit,
+  }] : [],
+  participant: data.provider ? [{
+    type: [{
+      coding: [{
+        system: 'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
+        code: 'ATND',
+        display: 'attender',
+      }],
+    }],
+    individual: {
+      display: data.provider,
+    },
+  }] : [],
+});
+
+const extractPatientInfo = (patient: Patient | null): PatientInfo => {
+  if (!patient) {
+    return {
+      name: 'Unknown Patient',
+      mrn: '',
+    };
+  }
+
+  const name = patient.name?.[0] ? 
+    `${patient.name[0].given?.join(' ') || ''} ${patient.name[0].family || ''}`.trim() : 
+    'Unknown Patient';
+
+  const mrn = patient.identifier?.find(id => id.type?.coding?.[0]?.code === 'MR')?.value || patient.id || '';
+
+  return {
+    name,
+    mrn,
+    birthDate: patient.birthDate,
+    gender: patient.gender,
+    phone: patient.telecom?.find(t => t.system === 'phone')?.value,
+  };
+};
+
+/**
+ * EncounterCard Component
+ */
+const EncounterCard: React.FC<EncounterCardProps> = ({ encounter, onViewDetails, onEdit }) => {
   const theme = useTheme();
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const handleMenuClose = () => {
+  const handleMenuClose = useCallback((): void => {
     setAnchorEl(null);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'finished': return 'success';
-      case 'in-progress': return 'warning';
-      case 'cancelled': return 'error';
-      default: return 'default';
-    }
-  };
+  }, []);
 
   const period = encounter.period || {};
   const startDate = period.start ? parseISO(period.start) : null;
   const endDate = period.end ? parseISO(period.end) : null;
+
+  const attendingProvider = encounter.participant?.find(p => 
+    p.type?.[0]?.coding?.[0]?.code === 'ATND'
+  )?.individual?.display;
 
   return (
     <Card sx={{ mb: 2 }}>
@@ -129,9 +303,9 @@ const EncounterCard = ({ encounter, onViewDetails, onEdit }) => {
                 {getEncounterTypeLabel(encounter)}
               </Typography>
               <Chip 
-                label={encounter.status} 
+                label={encounter.status || 'unknown'} 
                 size="small" 
-                color={getStatusColor(encounter.status)}
+                color={getStatusColor(encounter.status as EncounterStatus)}
               />
             </Stack>
 
@@ -154,14 +328,12 @@ const EncounterCard = ({ encounter, onViewDetails, onEdit }) => {
                 <Stack direction="row" spacing={1} alignItems="center">
                   <ProviderIcon fontSize="small" color="action" />
                   <Typography variant="body2" color="text.secondary">
-                    {encounter.participant.find(p => 
-                      p.type?.[0]?.coding?.[0]?.code === 'ATND'
-                    )?.individual?.display || 'No provider recorded'}
+                    {attendingProvider || 'No provider recorded'}
                   </Typography>
                 </Stack>
               )}
 
-              {encounter.reasonCode && (
+              {encounter.reasonCode && encounter.reasonCode.length > 0 && (
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Reason for visit:
@@ -170,7 +342,7 @@ const EncounterCard = ({ encounter, onViewDetails, onEdit }) => {
                     {encounter.reasonCode.map((reason, idx) => (
                       <Chip 
                         key={idx}
-                        label={reason.text || reason.coding?.[0]?.display} 
+                        label={reason.text || reason.coding?.[0]?.display || 'Unknown reason'} 
                         size="small"
                         variant="outlined"
                       />
@@ -203,85 +375,136 @@ const EncounterCard = ({ encounter, onViewDetails, onEdit }) => {
           Edit
         </Button>
       </CardActions>
-
     </Card>
   );
 };
 
-const EncountersTab = ({ patientId, onNotificationUpdate }) => {
+/**
+ * EncountersTab Component
+ */
+const EncountersTab: React.FC<EncountersTabProps> = ({ 
+  patientId, 
+  onNotificationUpdate,
+  sx 
+}) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { getPatientResources, isLoading, currentPatient } = useFHIRResource();
   
-  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'timeline'
-  const [filterType, setFilterType] = useState('all');
-  const [filterPeriod, setFilterPeriod] = useState('all'); // all, 1m, 3m, 6m, 1y
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [selectedEncounter, setSelectedEncounter] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
-  const [newEncounterDialogOpen, setNewEncounterDialogOpen] = useState(false);
-  const [exportAnchorEl, setExportAnchorEl] = useState(null);
-  const [newEncounterData, setNewEncounterData] = useState({
-    type: 'AMB',
-    reasonForVisit: '',
-    provider: '',
-    startDate: new Date().toISOString().split('T')[0],
-    startTime: new Date().toTimeString().split(' ')[0].slice(0, 5)
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedEncounter, setSelectedEncounter] = useState<Encounter | null>(null);
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ 
+    open: false, 
+    message: '', 
+    severity: 'success' 
   });
+  const [summaryDialogOpen, setSummaryDialogOpen] = useState<boolean>(false);
+  const [newEncounterDialogOpen, setNewEncounterDialogOpen] = useState<boolean>(false);
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+  const [newEncounterData, setNewEncounterData] = useState<NewEncounterData>(
+    createDefaultNewEncounterData()
+  );
 
   useEffect(() => {
     setLoading(false);
   }, []);
 
+  // Get encounters
+  const encounters = useMemo(() => {
+    return getPatientResources(patientId, 'Encounter') as Encounter[] || [];
+  }, [getPatientResources, patientId]);
+
+  // Filter encounters
+  const filteredEncounters = useMemo(() => {
+    return encounters.filter(encounter => {
+      // Type filter
+      const matchesType = filterType === 'all' || 
+        encounter.class?.code === filterType;
+
+      // Period filter
+      let matchesPeriod = true;
+      if (filterPeriod !== 'all' && encounter.period?.start) {
+        const startDate = parseISO(encounter.period.start);
+        const periodMap = {
+          '1m': subMonths(new Date(), 1),
+          '3m': subMonths(new Date(), 3),
+          '6m': subMonths(new Date(), 6),
+          '1y': subMonths(new Date(), 12),
+        };
+        matchesPeriod = isWithinInterval(startDate, {
+          start: periodMap[filterPeriod],
+          end: new Date(),
+        });
+      }
+
+      // Search filter
+      const matchesSearch = !searchTerm || 
+        getEncounterTypeLabel(encounter).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        encounter.reasonCode?.some(r => 
+          (r.text || r.coding?.[0]?.display || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+      return matchesType && matchesPeriod && matchesSearch;
+    });
+  }, [encounters, filterType, filterPeriod, searchTerm]);
+
+  // Sort by date descending
+  const sortedEncounters = useMemo(() => {
+    return [...filteredEncounters].sort((a, b) => {
+      const dateA = new Date(a.period?.start || 0);
+      const dateB = new Date(b.period?.start || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [filteredEncounters]);
+
   // Handle encounter selection for summary dialog
-  const handleViewEncounterDetails = (encounter) => {
+  const handleViewEncounterDetails = useCallback((encounter: Encounter): void => {
     setSelectedEncounter(encounter);
     setSummaryDialogOpen(true);
-  };
+  }, []);
 
-  const handleCloseSummaryDialog = () => {
+  const handleCloseSummaryDialog = useCallback((): void => {
     setSummaryDialogOpen(false);
     setSelectedEncounter(null);
-  };
+  }, []);
 
-  const handleNewEncounter = () => {
+  const handleNewEncounter = useCallback((): void => {
     setNewEncounterDialogOpen(true);
-  };
+  }, []);
 
-  const handlePrintEncounters = () => {
-    const patientInfo = {
-      name: currentPatient ? 
-        `${currentPatient.name?.[0]?.given?.join(' ') || ''} ${currentPatient.name?.[0]?.family || ''}`.trim() : 
-        'Unknown Patient',
-      mrn: currentPatient?.identifier?.find(id => id.type?.coding?.[0]?.code === 'MR')?.value || currentPatient?.id,
-      birthDate: currentPatient?.birthDate,
-      gender: currentPatient?.gender,
-      phone: currentPatient?.telecom?.find(t => t.system === 'phone')?.value
-    };
-    
+  const updateSnackbar = useCallback((updates: Partial<SnackbarState>): void => {
+    setSnackbar(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const handlePrintEncounters = useCallback((): void => {
+    const patientInfo = extractPatientInfo(currentPatient);
     const content = formatEncountersForPrint(sortedEncounters);
     
     printDocument({
       title: 'Patient Encounters',
       patient: patientInfo,
-      content
+      content,
     });
-  };
+  }, [currentPatient, sortedEncounters]);
 
-  const handleExportEncounters = (format) => {
+  const handleExportEncounters = useCallback((format: ExportFormat): void => {
     exportClinicalData({
       patient: currentPatient,
       data: filteredEncounters,
       columns: EXPORT_COLUMNS.encounters,
       format,
       title: 'Encounter_History',
-      formatForPrint: (data) => {
+      formatForPrint: (data: Encounter[]) => {
         let html = '<h2>Encounter History</h2>';
         data.forEach(encounter => {
-          const startDate = encounter.period?.start ? format(parseISO(encounter.period.start), 'MMM d, yyyy h:mm a') : 'Unknown';
-          const endDate = encounter.period?.end ? format(parseISO(encounter.period.end), 'MMM d, yyyy h:mm a') : 'Ongoing';
+          const startDate = encounter.period?.start ? 
+            format(parseISO(encounter.period.start), 'MMM d, yyyy h:mm a') : 'Unknown';
+          const endDate = encounter.period?.end ? 
+            format(parseISO(encounter.period.end), 'MMM d, yyyy h:mm a') : 'Ongoing';
           
           html += `
             <div class="section">
@@ -299,55 +522,20 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
           `;
         });
         return html;
-      }
+      },
     });
-  };
+  }, [currentPatient, filteredEncounters]);
   
-  const handleCreateEncounter = async () => {
+  const handleCreateEncounter = useCallback(async (): Promise<void> => {
     try {
-      // Create FHIR Encounter resource
-      const encounter = {
-        resourceType: 'Encounter',
-        status: 'in-progress',
-        class: {
-          system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',
-          code: newEncounterData.type,
-          display: newEncounterData.type === 'AMB' ? 'ambulatory' : 
-                  newEncounterData.type === 'IMP' ? 'inpatient' : 
-                  newEncounterData.type === 'EMER' ? 'emergency' : 'ambulatory'
-        },
-        type: [{
-          text: 'Office Visit'
-        }],
-        subject: {
-          reference: `Patient/${patientId}`
-        },
-        period: {
-          start: `${newEncounterData.startDate}T${newEncounterData.startTime}:00`
-        },
-        reasonCode: newEncounterData.reasonForVisit ? [{
-          text: newEncounterData.reasonForVisit
-        }] : [],
-        participant: newEncounterData.provider ? [{
-          type: [{
-            coding: [{
-              system: 'http://terminology.hl7.org/CodeSystem/v3-ParticipationType',
-              code: 'ATND',
-              display: 'attender'
-            }]
-          }],
-          individual: {
-            display: newEncounterData.provider
-          }
-        }] : []
-      };
+      const encounter = createEncounterResource(newEncounterData, patientId);
 
       const response = await fetch('/fhir/R4/Encounter', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(encounter)
+        body: JSON.stringify(encounter),
       });
 
       if (response.ok) {
@@ -357,78 +545,61 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
         }));
         
         setNewEncounterDialogOpen(false);
-        setNewEncounterData({
-          type: 'AMB',
-          reasonForVisit: '',
-          provider: '',
-          startDate: new Date().toISOString().split('T')[0],
-          startTime: new Date().toTimeString().split(' ')[0].slice(0, 5)
-        });
+        setNewEncounterData(createDefaultNewEncounterData());
 
-        setSnackbar({
+        updateSnackbar({
           open: true,
           message: 'New encounter created successfully',
-          severity: 'success'
+          severity: 'success',
         });
       } else {
         throw new Error(`Failed to create encounter: ${response.statusText}`);
-        setSnackbar({
-          open: true,
-          message: 'Failed to create encounter',
-          severity: 'error'
-        });
       }
     } catch (error) {
-      // Handle error
-      setSnackbar({
+      updateSnackbar({
         open: true,
-        message: 'Failed to create encounter: ' + error.message,
-        severity: 'error'
+        message: `Failed to create encounter: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        severity: 'error',
       });
     }
-  };
+  }, [newEncounterData, patientId, updateSnackbar]);
 
-  // Get encounters
-  const encounters = getPatientResources(patientId, 'Encounter') || [];
+  const updateNewEncounterData = useCallback((updates: Partial<NewEncounterData>): void => {
+    setNewEncounterData(prev => ({ ...prev, ...updates }));
+  }, []);
 
-  // Filter encounters
-  const filteredEncounters = encounters.filter(encounter => {
-    // Type filter
-    const matchesType = filterType === 'all' || 
-      encounter.class?.code === filterType;
-
-    // Period filter
-    let matchesPeriod = true;
-    if (filterPeriod !== 'all' && encounter.period?.start) {
-      const startDate = parseISO(encounter.period.start);
-      const periodMap = {
-        '1m': subMonths(new Date(), 1),
-        '3m': subMonths(new Date(), 3),
-        '6m': subMonths(new Date(), 6),
-        '1y': subMonths(new Date(), 12)
-      };
-      matchesPeriod = isWithinInterval(startDate, {
-        start: periodMap[filterPeriod],
-        end: new Date()
-      });
+  const handleSelectChange = useCallback((field: 'type' | 'filterType' | 'filterPeriod') => (
+    event: SelectChangeEvent<string>
+  ): void => {
+    const value = event.target.value;
+    
+    if (field === 'type') {
+      updateNewEncounterData({ type: value as EncounterClass });
+    } else if (field === 'filterType') {
+      setFilterType(value);
+    } else if (field === 'filterPeriod') {
+      setFilterPeriod(value as FilterPeriod);
     }
+  }, [updateNewEncounterData]);
 
-    // Search filter
-    const matchesSearch = !searchTerm || 
-      getEncounterTypeLabel(encounter).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      encounter.reasonCode?.some(r => 
-        (r.text || r.coding?.[0]?.display || '').toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  const handleTextFieldChange = useCallback((field: keyof NewEncounterData) => (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
+    updateNewEncounterData({ [field]: event.target.value });
+  }, [updateNewEncounterData]);
 
-    return matchesType && matchesPeriod && matchesSearch;
-  });
+  const handleExportMenuClick = useCallback((event: React.MouseEvent<HTMLElement>): void => {
+    setExportAnchorEl(event.currentTarget);
+  }, []);
 
-  // Sort by date descending
-  const sortedEncounters = [...filteredEncounters].sort((a, b) => {
-    const dateA = new Date(a.period?.start || 0);
-    const dateB = new Date(b.period?.start || 0);
-    return dateB - dateA;
-  });
+  const handleExportMenuClose = useCallback((): void => {
+    setExportAnchorEl(null);
+  }, []);
+
+  const handleExportFormat = useCallback((format: ExportFormat): void => {
+    handleExportEncounters(format);
+    handleExportMenuClose();
+  }, [handleExportEncounters, handleExportMenuClose]);
 
   if (loading) {
     return (
@@ -439,7 +610,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, ...sx }}>
       {/* Header */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">
@@ -468,7 +639,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
                 <InputAdornment position="start">
                   <SearchIcon />
                 </InputAdornment>
-              )
+              ),
             }}
           />
           
@@ -476,7 +647,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
             <InputLabel>Type</InputLabel>
             <Select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={handleSelectChange('filterType')}
               label="Type"
             >
               <MenuItem value="all">All Types</MenuItem>
@@ -491,7 +662,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
             <InputLabel>Period</InputLabel>
             <Select
               value={filterPeriod}
-              onChange={(e) => setFilterPeriod(e.target.value)}
+              onChange={handleSelectChange('filterPeriod')}
               label="Period"
             >
               <MenuItem value="all">All Time</MenuItem>
@@ -524,7 +695,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
           <Button
             variant="outlined"
             startIcon={<ExportIcon />}
-            onClick={(e) => setExportAnchorEl(e.currentTarget)}
+            onClick={handleExportMenuClick}
           >
             Export
           </Button>
@@ -604,20 +775,19 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
         </Timeline>
       )}
 
-      {/* Encounter Summary Dialog */}
       {/* Export Menu */}
       <Menu
         anchorEl={exportAnchorEl}
         open={Boolean(exportAnchorEl)}
-        onClose={() => setExportAnchorEl(null)}
+        onClose={handleExportMenuClose}
       >
-        <MenuItem onClick={() => { handleExportEncounters('csv'); setExportAnchorEl(null); }}>
+        <MenuItem onClick={() => handleExportFormat('csv')}>
           Export as CSV
         </MenuItem>
-        <MenuItem onClick={() => { handleExportEncounters('json'); setExportAnchorEl(null); }}>
+        <MenuItem onClick={() => handleExportFormat('json')}>
           Export as JSON
         </MenuItem>
-        <MenuItem onClick={() => { handleExportEncounters('pdf'); setExportAnchorEl(null); }}>
+        <MenuItem onClick={() => handleExportFormat('pdf')}>
           Export as PDF
         </MenuItem>
       </Menu>
@@ -630,7 +800,12 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
       />
 
       {/* New Encounter Dialog */}
-      <Dialog open={newEncounterDialogOpen} onClose={() => setNewEncounterDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={newEncounterDialogOpen} 
+        onClose={() => setNewEncounterDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+      >
         <DialogTitle>New Encounter</DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
@@ -638,7 +813,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
               <InputLabel>Encounter Type</InputLabel>
               <Select
                 value={newEncounterData.type}
-                onChange={(e) => setNewEncounterData({ ...newEncounterData, type: e.target.value })}
+                onChange={handleSelectChange('type')}
                 label="Encounter Type"
               >
                 <MenuItem value="AMB">Ambulatory (Office Visit)</MenuItem>
@@ -652,7 +827,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
               fullWidth
               label="Reason for Visit"
               value={newEncounterData.reasonForVisit}
-              onChange={(e) => setNewEncounterData({ ...newEncounterData, reasonForVisit: e.target.value })}
+              onChange={handleTextFieldChange('reasonForVisit')}
               multiline
               rows={2}
             />
@@ -661,7 +836,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
               fullWidth
               label="Provider"
               value={newEncounterData.provider}
-              onChange={(e) => setNewEncounterData({ ...newEncounterData, provider: e.target.value })}
+              onChange={handleTextFieldChange('provider')}
               placeholder="Enter provider name"
             />
 
@@ -670,7 +845,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
                 label="Date"
                 type="date"
                 value={newEncounterData.startDate}
-                onChange={(e) => setNewEncounterData({ ...newEncounterData, startDate: e.target.value })}
+                onChange={handleTextFieldChange('startDate')}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
@@ -678,7 +853,7 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
                 label="Time"
                 type="time"
                 value={newEncounterData.startTime}
-                onChange={(e) => setNewEncounterData({ ...newEncounterData, startTime: e.target.value })}
+                onChange={handleTextFieldChange('startTime')}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
@@ -701,11 +876,11 @@ const EncountersTab = ({ patientId, onNotificationUpdate }) => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        onClose={() => updateSnackbar({ open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >
         <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          onClose={() => updateSnackbar({ open: false })} 
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >
