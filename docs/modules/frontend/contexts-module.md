@@ -13,6 +13,10 @@ Contexts Module
 ├── ClinicalWorkflowContext.tsx ✅ (Cross-module events) - Migrated
 ├── AuthContext.tsx ✅ (Authentication state) - Migrated
 ├── WebSocketContext.tsx ✅ (Real-time updates) - Migrated
+├── InboxContext.tsx ✅ (Clinical messaging) - Migrated
+├── AppointmentContext.tsx ✅ (Appointment scheduling) - Migrated
+├── TaskContext.tsx ✅ (Task management) - Migrated
+├── DocumentationContext.tsx ✅ (Clinical documentation) - Migrated
 ├── PatientContext.js ⏳ (Current patient state) - Pending
 └── Other contexts... ⏳ - Pending
 ```
@@ -25,6 +29,10 @@ Contexts Module
 | ClinicalWorkflowContext | ✅ Migrated | 2025-01-12 | Strongly typed event system |
 | AuthContext | ✅ Migrated | 2025-01-12 | RBAC types, dual-mode auth |
 | WebSocketContext | ✅ Migrated | 2025-01-12 | Enhanced connection management |
+| InboxContext | ✅ Migrated | 2025-07-12 | Type-safe clinical messaging |
+| AppointmentContext | ✅ Migrated | 2025-07-12 | FHIR appointment scheduling |
+| TaskContext | ✅ Migrated | 2025-07-12 | Clinical task management |
+| DocumentationContext | ✅ Migrated | 2025-07-12 | Clinical documentation |
 | PatientContext | ⏳ Pending | - | Current patient state |
 | Others | ⏳ Pending | - | Lower priority contexts |
 
@@ -287,6 +295,265 @@ const {
 } = useWebSocketStatus();
 ```
 
+### InboxContext ✅ **Migrated to TypeScript**
+**Purpose**: Clinical messaging and FHIR Communication resource management
+
+**Message Management**:
+```typescript
+interface InboxContextType {
+  // Current state
+  messages: TransformedMessage[];
+  unreadCount: number;
+  loading: boolean;
+  error: string | null;
+  stats: InboxStats;
+
+  // Actions
+  loadInboxItems: (filters?: InboxFilters) => Promise<void>;
+  loadInboxStats: () => Promise<void>;
+  markInboxItemRead: (messageId: string) => Promise<void>;
+  acknowledgeInboxItems: (messageIds: string[]) => Promise<void>;
+  forwardInboxItems: (messageIds: string[], recipients: string[]) => Promise<void>;
+  createMessage: (messageData: MessageCreationData) => Promise<any>;
+}
+```
+
+**Message Types**:
+```typescript
+export type MessagePriority = 'routine' | 'urgent' | 'asap' | 'stat';
+export type MessageCategory = 'notification' | 'alert' | 'reminder' | 'instruction';
+export type MessageStatus = 'preparation' | 'in-progress' | 'on-hold' | 'completed' | 'entered-in-error' | 'stopped';
+
+interface TransformedMessage {
+  id: string;
+  status: MessageStatus;
+  priority: MessagePriority;
+  category: MessageCategory;
+  subject?: string;
+  topic: string;
+  sender?: string;
+  recipient?: string;
+  sent?: string;
+  received?: string;
+  payload: MessagePayload[];
+  isRead: boolean;
+  encounter?: string;
+  basedOn: MessageReference[];
+}
+```
+
+**FHIR Integration**:
+- Uses FHIR Communication resources for all messaging
+- Transforms FHIR data to UI-friendly interfaces
+- Supports message filtering and statistics
+- Handles message forwarding and acknowledgment
+- Type-safe FHIR resource creation and updates
+
+**Key Features**:
+- ✅ **Type-safe messaging** with discriminated unions
+- ✅ **FHIR Communication** resource management
+- ✅ **Message filtering** with comprehensive filter interface
+- ✅ **Statistics tracking** with priority and category counts
+- ✅ **Batch operations** for acknowledgment and forwarding
+- ✅ **Real-time updates** integration with message creation
+
+### AppointmentContext ✅ **Migrated to TypeScript**
+**Purpose**: FHIR R4 compliant appointment scheduling and management
+
+**Appointment Management**:
+```typescript
+interface AppointmentContextType extends AppointmentState {
+  // Core operations
+  fetchAppointments: (customFilters?: AppointmentFilters | null, customPagination?: AppointmentPagination | null) => Promise<AppointmentSearchResult>;
+  createAppointment: (appointmentData: CreateAppointmentData) => Promise<Appointment>;
+  updateAppointment: (appointmentId: string, updateData: Partial<Appointment>) => Promise<Appointment>;
+  cancelAppointment: (appointmentId: string, reason?: string) => Promise<Appointment>;
+  rescheduleAppointment: (appointmentId: string, newStart: string, newEnd: string) => Promise<Appointment>;
+  deleteAppointment: (appointmentId: string) => Promise<void>;
+  
+  // Helper functions
+  getAppointmentsByPatient: (patientId: string) => Promise<AppointmentSearchResult>;
+  getAppointmentsByPractitioner: (practitionerId: string) => Promise<AppointmentSearchResult>;
+  getAppointmentsByDateRange: (startDate: string, endDate: string) => Promise<AppointmentSearchResult>;
+}
+```
+
+**FHIR R4 Status Management**:
+```typescript
+export type AppointmentStatus = 
+  | 'proposed' | 'pending' | 'booked' | 'arrived' 
+  | 'fulfilled' | 'cancelled' | 'noshow' 
+  | 'entered-in-error' | 'checked-in' | 'waitlist';
+
+export type ParticipantStatus = 
+  | 'accepted' | 'declined' | 'tentative' | 'needs-action';
+
+export const APPOINTMENT_STATUS: Record<string, AppointmentStatus> = {
+  PROPOSED: 'proposed',
+  PENDING: 'pending',
+  BOOKED: 'booked',
+  // ... all FHIR R4 compliant statuses
+} as const;
+```
+
+**Advanced Filtering**:
+```typescript
+interface AppointmentFilters {
+  status?: AppointmentStatus;
+  patient?: string;
+  practitioner?: string;
+  location?: string;
+  dateRange: {
+    start: string | null;
+    end: string | null;
+  };
+}
+```
+
+**State Management Pattern**:
+- Uses `useReducer` with discriminated union actions
+- Comprehensive loading and error states
+- Optimistic updates for better UX
+- Automatic patient resource refresh integration
+
+**Key Features**:
+- ✅ **FHIR R4 Compliance** with complete Appointment resource support
+- ✅ **Type-safe status management** with proper workflow transitions
+- ✅ **Participant management** with role-based access
+- ✅ **Advanced filtering** with date range and multi-criteria search
+- ✅ **Pagination support** with configurable page sizes
+- ✅ **Appointment lifecycle** management (create, update, cancel, reschedule)
+- ✅ **Patient resource integration** with automatic refresh
+- ✅ **Error handling** with comprehensive error states
+
+### TaskContext ✅ **Migrated to TypeScript**
+**Purpose**: Clinical task management with FHIR Task resources, inbox, and care team functionality
+
+**Task Management Interface**:
+```typescript
+interface TaskContextType {
+  // Task operations
+  tasks: TransformedTask[];
+  taskStats: TaskStats | null;
+  loadTasks: (filters?: TaskFilters) => Promise<void>;
+  createTask: (taskData: TaskCreationData) => Promise<TransformedTask>;
+  updateTask: (taskId: string, updates: TaskUpdateData) => Promise<void>;
+  completeTask: (taskId: string, completionNotes?: TaskCompletionNotes) => Promise<void>;
+  
+  // Inbox management
+  inboxItems: InboxItem[];
+  inboxStats: InboxStats | null;
+  loadInboxItems: (filters?: InboxFilters) => Promise<void>;
+  acknowledgeInboxItems: (itemIds: string[]) => Promise<void>;
+  createTaskFromInbox: (itemId: string, taskData: TaskCreationData) => Promise<void>;
+  
+  // Care team coordination
+  careTeams: CareTeam[];
+  createCareTeam: (teamData: CareTeamCreationData) => Promise<CareTeam>;
+  updateCareTeamMembers: (teamId: string, members: CareTeamMember[]) => Promise<void>;
+}
+```
+
+**FHIR Task Lifecycle**:
+```typescript
+export type TaskStatus = 
+  | 'draft' | 'requested' | 'received' | 'accepted' | 'rejected'
+  | 'ready' | 'cancelled' | 'in-progress' | 'on-hold' 
+  | 'failed' | 'completed' | 'entered-in-error';
+
+export type TaskPriority = 'routine' | 'urgent' | 'asap' | 'stat';
+export type TaskIntent = 'proposal' | 'plan' | 'order' | 'original-order';
+export type TaskType = 'review' | 'follow-up' | 'lab-review' | 'med-recon' | 'prior-auth';
+```
+
+**Comprehensive Feature Set**:
+- **Multi-Domain Management**: Tasks, inbox, care teams, and patient lists in unified context
+- **FHIR Task Transformation**: Bidirectional conversion between FHIR and internal formats
+- **Clinical Workflow Integration**: Task creation from inbox items and ServiceRequests
+- **Care Team Coordination**: Multi-practitioner task assignment and collaboration
+- **Advanced Filtering**: Status, priority, assignment, and date-based task filtering
+- **Patient List Management**: Bulk operations across patient cohorts
+
+**Key Features**:
+- ✅ **FHIR R4 Task compliance** with complete resource lifecycle management
+- ✅ **Type-safe transformations** between FHIR and UI-friendly formats
+- ✅ **Inbox workflow integration** with task creation and forwarding
+- ✅ **Care team management** with role-based access and collaboration
+- ✅ **Patient list operations** with bulk task management
+- ✅ **Comprehensive filtering** with multi-criteria search capabilities
+- ✅ **Real-time integration** with patient resource refresh
+- ✅ **Clinical workflow support** with status transitions and completion tracking
+
+### DocumentationContext ✅ **Migrated to TypeScript**
+**Purpose**: Clinical documentation management with FHIR DocumentReference resources and SOAP note functionality
+
+**Documentation Management Interface**:
+```typescript
+interface DocumentationContextType {
+  // Current state
+  currentNote: ClinicalNote | null;
+  noteTemplates: NoteTemplate[];
+  recentNotes: RecentNote[];
+  isDirty: boolean;
+  isSaving: boolean;
+
+  // Note operations
+  createNewNote: (noteType: NoteType, templateId?: string) => void;
+  loadNote: (noteId: string) => Promise<void>;
+  saveNote: () => Promise<void>;
+  signNote: () => Promise<void>;
+  deleteNote: (noteId: string) => Promise<void>;
+  
+  // Content operations
+  updateNoteField: (field: keyof ClinicalNote, value: string) => void;
+  updateSOAPSection: (section: keyof SOAPSections, value: string) => void;
+  expandSmartPhrase: (phrase: string) => string;
+  createAddendum: (parentNoteId: string, content: string) => Promise<any>;
+}
+```
+
+**SOAP Note Structure**:
+```typescript
+interface SOAPSections {
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+  chiefComplaint?: string;
+  historyPresentIllness?: string;
+  reviewOfSystems?: string;
+  physicalExam?: string;
+}
+
+export type NoteType = 
+  | 'progress' | 'history_physical' | 'consultation' | 'discharge'
+  | 'operative' | 'procedure' | 'emergency' | 'nursing' 
+  | 'therapy' | 'addendum' | 'summary';
+
+export type DocumentStatus = 
+  | 'draft' | 'preliminary' | 'final' | 'amended' 
+  | 'entered-in-error' | 'current' | 'superseded';
+```
+
+**Clinical Note Management**:
+- **Template System**: Pre-configured note templates with SOAP structure
+- **Smart Phrases**: Expandable shortcuts for common clinical text
+- **Document Lifecycle**: Draft → Save → Sign → Addendum workflow
+- **FHIR Compliance**: Complete DocumentReference resource management
+- **LOINC Integration**: Proper medical terminology and coding
+
+**Key Features**:
+- ✅ **FHIR DocumentReference** with complete resource lifecycle management
+- ✅ **SOAP note structure** with dedicated interfaces for clinical sections
+- ✅ **Template management** with specialty-specific templates
+- ✅ **Smart phrase expansion** with predefined clinical shortcuts
+- ✅ **Document signing workflow** with status transitions and authentication
+- ✅ **Addendum creation** with proper document relationships
+- ✅ **Content encoding** with base64 attachment handling
+- ✅ **Type-safe transformations** between FHIR and UI-friendly formats
+- ✅ **Real-time integration** with patient resource refresh
+- ✅ **Clinical workflow support** with draft/sign/addendum lifecycle
+
 ## Shared Patterns
 
 ### Context Provider Pattern
@@ -539,6 +806,30 @@ Contexts Module
   - Typed message interfaces
   - Enhanced connection management
   - Utility hooks for better DX
+  
+- ✅ **InboxContext** migrated to TypeScript
+  - Type-safe clinical messaging with FHIR Communication
+  - Message priority and category discriminated unions
+  - Comprehensive message filtering and statistics
+  - Batch operations for message management
+
+- ✅ **AppointmentContext** migrated to TypeScript
+  - FHIR R4 compliant appointment scheduling system
+  - Type-safe appointment status and participant management
+  - Advanced filtering with date ranges and multi-criteria search
+  - Complete appointment lifecycle management (CRUD + cancel/reschedule)
+
+- ✅ **TaskContext** migrated to TypeScript
+  - Clinical task management with FHIR Task resources
+  - Multi-domain context (tasks, inbox, care teams, patient lists)
+  - Type-safe FHIR transformations and workflow integration
+  - Comprehensive task lifecycle and status management
+
+- ✅ **DocumentationContext** migrated to TypeScript
+  - Clinical documentation with FHIR DocumentReference resources
+  - SOAP note structure with comprehensive type safety
+  - Template system and smart phrase expansion
+  - Document lifecycle management (draft/save/sign/addendum)
 
 ### Migration Benefits Achieved
 - **Type Safety**: 100% type coverage in migrated contexts
@@ -547,8 +838,15 @@ Contexts Module
 - **Documentation**: Types serve as living documentation
 - **Refactoring**: Safe refactoring with compiler assistance
 
-### Next Steps
-- Migrate remaining context files (PatientContext, etc.)
+### Next Steps - Phase 3 Extension
+- Migrate remaining context files in priority order:
+  - WorkflowContext ✅ (Complete)
+  - ClinicalContext ✅ (Complete) 
+  - InboxContext ✅ (Complete)
+  - AppointmentContext ✅ (Complete)
+  - TaskContext ✅ (Complete)
+  - DocumentationContext ✅ (Complete)
+  - OrderContext (633 lines) - **Next target**
 - Add comprehensive unit tests for TypeScript contexts
 - Update consuming components to leverage new types
 - Create context composition patterns guide
