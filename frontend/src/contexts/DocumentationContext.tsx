@@ -305,8 +305,8 @@ export const DocumentationProvider: React.FC<DocumentationProviderProps> = ({ ch
           sections.physicalExam = parsed.physicalExam || '';
         }
       } catch (e) {
-        // If not JSON, treat as plain text
-        sections.content = content;
+        // If not JSON, treat as plain text - put it in subjective section
+        sections.subjective = content;
       }
     }
 
@@ -499,6 +499,8 @@ export const DocumentationProvider: React.FC<DocumentationProviderProps> = ({ ch
   const loadNoteTemplates = async (specialty?: string): Promise<void> => {
     try {
       // For now, use hardcoded templates until we implement a proper template service
+      // TODO: Filter templates by specialty when backend service is implemented
+      console.log('Loading note templates for specialty:', specialty || 'all');
       const templates: NoteTemplate[] = [
         {
           id: 'soap-basic',

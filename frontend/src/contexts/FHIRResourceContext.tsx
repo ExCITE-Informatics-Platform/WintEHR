@@ -1,17 +1,14 @@
 import { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
 import { fhirClient } from '../services/fhirClient';
 import { intelligentCache } from '../utils/intelligentCache';
-// @ts-ignore
 import { 
   Resource, 
   Patient, 
   Encounter, 
-  Observation, 
-  Condition, 
-  MedicationRequest, 
   Bundle, 
   FHIRResourceType 
 } from '../types/fhir';
+import type { Observation, Condition, MedicationRequest } from '../types/fhir';
 
 /**
  * FHIR Resource Context with TypeScript

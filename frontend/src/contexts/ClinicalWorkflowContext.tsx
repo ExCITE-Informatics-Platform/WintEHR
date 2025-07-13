@@ -661,26 +661,31 @@ export const ClinicalWorkflowProvider: React.FC<ClinicalWorkflowProviderProps> =
   const createDocumentationTemplate = async (encounterData: EncounterData): Promise<void> => {
     // This would create a SOAP note template for the encounter
     // TODO: Implement documentation template creation
+    console.log('Creating documentation template for encounter:', encounterData.id);
   };
 
   const applyOrderSets = async (encounterData: EncounterData): Promise<void> => {
     // This would suggest order sets based on encounter type and patient problems
     // TODO: Implement order set application logic
+    console.log('Applying order sets for encounter type:', encounterData.type);
   };
 
   const suggestCareGoals = async (problemData: ProblemData): Promise<void> => {
     // This would suggest care plan goals based on the problem
     // TODO: Implement care goal suggestion logic
+    console.log('Suggesting care goals for problem:', problemData.code);
   };
 
   const suggestOrderSets = async (problemData: ProblemData): Promise<void> => {
     // This would suggest relevant order sets for the problem
     // TODO: Implement order set suggestion logic
+    console.log('Suggesting order sets for problem:', problemData.display);
   };
 
   const suggestFollowUpOrders = async (abnormalResults: AbnormalResult[]): Promise<void> => {
     // This would suggest follow-up orders for abnormal results
     // TODO: Implement follow-up order suggestion logic
+    console.log('Suggesting follow-up orders for', abnormalResults.length, 'abnormal results');
   };
 
   // Clear notifications
