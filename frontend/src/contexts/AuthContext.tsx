@@ -95,6 +95,9 @@ export interface AuthState {
  * Authentication context interface
  */
 export interface AuthContextType extends AuthState {
+  // Current user state (for convenience)
+  currentUser: User | null;
+  
   // Authentication methods
   login: (credentials: LoginCredentials) => Promise<User>;
   logout: () => Promise<void>;
@@ -196,6 +199,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }, 5000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [error]);
 
   const checkSession = useCallback(async (): Promise<void> => {
@@ -468,11 +472,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const interval = setInterval(checkExpiry, 60 * 1000); // Check every minute
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [sessionExpiry, authMode, refreshAuth, logout]);
 
   const value: AuthContextType = {
     // State
     user,
+    currentUser: user, // Convenience property
     isAuthenticated: !!user,
     authMode,
     loading,

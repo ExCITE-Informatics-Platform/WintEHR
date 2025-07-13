@@ -199,9 +199,9 @@ export const ClinicalProvider: React.FC<ClinicalProviderProps> = ({ children }) 
 
   // Use WebSocket hook for patient updates
   const { connected: wsConnected } = usePatientUpdates(
-    currentPatient?.id,
+    currentPatient?.id || '',
     { enabled: !!currentPatient }
-  );
+  ) as any;
 
   // Initialize WebSocket connection
   useEffect(() => {

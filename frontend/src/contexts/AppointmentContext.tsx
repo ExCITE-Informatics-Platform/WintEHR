@@ -421,12 +421,10 @@ export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ childr
     try {
       // Ensure required FHIR fields
       const fhirAppointment: Omit<Appointment, 'id' | 'meta'> = {
+        ...appointmentData,
         resourceType: 'Appointment',
         status: appointmentData.status || APPOINTMENT_STATUS.BOOKED,
-        start: appointmentData.start,
-        end: appointmentData.end,
-        participant: appointmentData.participant || [],
-        ...appointmentData
+        participant: appointmentData.participant || []
       } as any;
       
       const response = await fhirClient.create('Appointment' as any, fhirAppointment);
@@ -435,7 +433,7 @@ export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ childr
       // Refresh patient resources if patient is involved
       const patientParticipant = fhirAppointment.participant?.find((p: any) => 
         p.actor?.reference?.startsWith('Patient/'));
-      if (patientParticipant) {
+      if (patientParticipant?.actor?.reference) {
         const patientId = patientParticipant.actor.reference.replace('Patient/', '');
         await refreshPatientResources(patientId);
       }

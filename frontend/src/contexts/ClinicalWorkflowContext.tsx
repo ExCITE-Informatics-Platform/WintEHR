@@ -649,11 +649,13 @@ export const ClinicalWorkflowProvider: React.FC<ClinicalWorkflowProviderProps> =
   const createPendingResultPlaceholder = async (orderData: OrderData): Promise<void> => {
     // This would create a placeholder result that gets updated when actual results arrive
     // TODO: Implement pending result placeholder creation
+    console.log('Creating pending result placeholder for order:', orderData.id);
   };
 
   const scheduleMonitoringForMedication = async (dispenseData: MedicationDispenseData): Promise<void> => {
     // This would schedule monitoring labs based on medication type
     // TODO: Implement medication monitoring scheduler
+    console.log('Scheduling medication monitoring for:', dispenseData.medicationName);
   };
 
   const createDocumentationTemplate = async (encounterData: EncounterData): Promise<void> => {
