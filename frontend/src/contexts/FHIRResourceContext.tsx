@@ -177,7 +177,17 @@ const createInitialResourceStorage = (): ResourceStorage => ({
   ImagingStudy: {},
   Practitioner: {},
   Organization: {},
-  ServiceRequest: {}
+  ServiceRequest: {},
+  Goal: {},
+  Task: {},
+  Measure: {},
+  MeasureReport: {},
+  Group: {},
+  Communication: {},
+  Appointment: {},
+  AppointmentResponse: {},
+  Slot: {},
+  Schedule: {}
 });
 
 const initialState: FHIRResourceState = {

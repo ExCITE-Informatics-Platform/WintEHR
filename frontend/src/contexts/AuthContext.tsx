@@ -5,6 +5,7 @@
  * Migrated to TypeScript with comprehensive type safety for user authentication,
  * authorization, and session management supporting both training and JWT modes.
  */
+import * as React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import api from '../services/api';
 
