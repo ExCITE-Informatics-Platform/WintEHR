@@ -1,8 +1,11 @@
 /**
  * ComponentLibrary Component
  * Displays available components for custom layouts with drag-and-drop support
+ * 
+ * Migrated to TypeScript with comprehensive type safety for workspace component management.
  */
-import React from 'react';
+
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -17,7 +20,9 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   useTheme,
-  alpha
+  alpha,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -35,11 +40,57 @@ import {
   Search as SearchIcon,
   Category as CategoryIcon,
   ShowChart as ChartLineIcon,
-  Biotech as LabIcon
+  Biotech as LabIcon,
 } from '@mui/icons-material';
 
-// Extended component library with more options
-export const COMPONENT_LIBRARY = [
+/**
+ * Type definitions for ComponentLibrary
+ */
+export type ComponentCategory = 'overview' | 'clinical' | 'care' | 'charts';
+
+export type ComponentId = 
+  | 'summary' 
+  | 'timeline' 
+  | 'alerts' 
+  | 'chart' 
+  | 'encounters' 
+  | 'results' 
+  | 'orders' 
+  | 'documentation' 
+  | 'vitals' 
+  | 'careplan' 
+  | 'team' 
+  | 'trends' 
+  | 'vitalschart' 
+  | 'labtrends';
+
+export interface ComponentDefinition {
+  id: ComponentId;
+  name: string;
+  description: string;
+  icon: React.ReactElement;
+  category: ComponentCategory;
+  minWidth: number;
+  minHeight: number;
+  defaultWidth: number;
+  defaultHeight: number;
+}
+
+export interface ComponentLibraryProps {
+  onComponentSelect?: (component: ComponentDefinition) => void;
+  selectedCategory?: ComponentCategory | 'all';
+  searchTerm?: string;
+  sx?: SxProps<Theme>;
+}
+
+export interface DragStartEvent extends React.DragEvent<HTMLDivElement> {
+  dataTransfer: DataTransfer;
+}
+
+/**
+ * Extended component library with more options
+ */
+export const COMPONENT_LIBRARY: ComponentDefinition[] = [
   // Overview Components
   {
     id: 'summary',
@@ -203,37 +254,82 @@ export const COMPONENT_LIBRARY = [
   }
 ];
 
-const ComponentLibrary = ({ onComponentSelect, selectedCategory = 'all', searchTerm = '' }) => {
-  const theme = useTheme();
-  const [category, setCategory] = React.useState(selectedCategory);
-  const [search, setSearch] = React.useState(searchTerm);
+/**
+ * Helper functions
+ */
+const getCategoryDisplayName = (category: ComponentCategory | 'all'): string => {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+};
 
-  // Filter components based on category and search
-  const filteredComponents = COMPONENT_LIBRARY.filter(component => {
+const filterComponents = (
+  components: ComponentDefinition[], 
+  category: ComponentCategory | 'all', 
+  search: string
+): ComponentDefinition[] => {
+  return components.filter(component => {
     const matchesCategory = category === 'all' || component.category === category;
     const matchesSearch = !search || 
       component.name.toLowerCase().includes(search.toLowerCase()) ||
       component.description.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+};
+
+/**
+ * ComponentLibrary Component
+ */
+const ComponentLibrary: React.FC<ComponentLibraryProps> = ({ 
+  onComponentSelect, 
+  selectedCategory = 'all', 
+  searchTerm = '',
+  sx 
+}) => {
+  const theme = useTheme();
+  const [category, setCategory] = useState<ComponentCategory | 'all'>(selectedCategory);
+  const [search, setSearch] = useState<string>(searchTerm);
+
+  // Filter components based on category and search
+  const filteredComponents = filterComponents(COMPONENT_LIBRARY, category, search);
 
   // Get unique categories
-  const categories = ['all', ...new Set(COMPONENT_LIBRARY.map(c => c.category))];
+  const categories: (ComponentCategory | 'all')[] = [
+    'all', 
+    ...Array.from(new Set(COMPONENT_LIBRARY.map(c => c.category)))
+  ];
 
-  const handleDragStart = (e, component) => {
+  const handleDragStart = (e: DragStartEvent, component: ComponentDefinition): void => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('component', JSON.stringify(component));
   };
 
+  const handleCategoryChange = (
+    event: React.MouseEvent<HTMLElement>, 
+    newCategory: ComponentCategory | 'all' | null
+  ): void => {
+    if (newCategory) {
+      setCategory(newCategory);
+    }
+  };
+
+  const handleComponentClick = (component: ComponentDefinition): void => {
+    if (onComponentSelect) {
+      onComponentSelect(component);
+    }
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    setSearch(event.target.value);
+  };
+
   return (
-    <Box>
+    <Box sx={sx}>
       <Stack spacing={2} mb={3}>
         <TextField
           fullWidth
           size="small"
           placeholder="Search components..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -241,21 +337,23 @@ const ComponentLibrary = ({ onComponentSelect, selectedCategory = 'all', searchT
               </InputAdornment>
             )
           }}
+          aria-label="Search components"
         />
 
         <ToggleButtonGroup
           value={category}
           exclusive
-          onChange={(e, newCategory) => newCategory && setCategory(newCategory)}
+          onChange={handleCategoryChange}
           fullWidth
           size="small"
+          aria-label="Component category filter"
         >
           {categories.map(cat => (
-            <ToggleButton key={cat} value={cat}>
+            <ToggleButton key={cat} value={cat} aria-label={`Filter by ${cat} category`}>
               <Stack direction="row" spacing={1} alignItems="center">
                 {cat === 'all' && <CategoryIcon />}
                 <Typography variant="caption">
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  {getCategoryDisplayName(cat)}
                 </Typography>
               </Stack>
             </ToggleButton>
@@ -269,7 +367,7 @@ const ComponentLibrary = ({ onComponentSelect, selectedCategory = 'all', searchT
             <Card
               draggable
               onDragStart={(e) => handleDragStart(e, component)}
-              onClick={() => onComponentSelect && onComponentSelect(component)}
+              onClick={() => handleComponentClick(component)}
               sx={{
                 cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -283,6 +381,9 @@ const ComponentLibrary = ({ onComponentSelect, selectedCategory = 'all', searchT
                   boxShadow: theme.shadows[2]
                 }
               }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Add ${component.name} component`}
             >
               <CardContent>
                 <Stack direction="row" spacing={2} alignItems="flex-start">
