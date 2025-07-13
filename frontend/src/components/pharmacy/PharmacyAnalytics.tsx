@@ -1,7 +1,10 @@
 /**
  * PharmacyAnalytics Component
  * Analytics dashboard for pharmacy workflow metrics and insights
+ * 
+ * Migrated to TypeScript with comprehensive type safety for pharmacy analytics.
  */
+
 import React, { useMemo } from 'react';
 import {
   Box,
@@ -18,7 +21,9 @@ import {
   ListItemText,
   ListItemAvatar,
   Avatar,
-  useTheme
+  useTheme,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   Timeline as TrendIcon,
@@ -28,7 +33,7 @@ import {
   LocalPharmacy as PharmacyIcon,
   TrendingUp as UpIcon,
   TrendingDown as DownIcon,
-  Remove as FlatIcon
+  Remove as FlatIcon,
 } from '@mui/icons-material';
 import {
   AreaChart,
@@ -43,110 +48,266 @@ import {
   Cell,
   BarChart,
   Bar,
-  Legend
+  Legend,
 } from 'recharts';
 import { format, subDays, startOfDay } from 'date-fns';
+import { MedicationRequest } from '@ahryman40k/ts-fhir-types/lib/R4';
 
-const PharmacyAnalytics = ({ queueStats, medicationRequests }) => {
+/**
+ * Type definitions for PharmacyAnalytics component
+ */
+export interface QueueStats {
+  total: number;
+  newOrders: number;
+  verification: number;
+  dispensing: number;
+  ready: number;
+  completed: number;
+}
+
+export interface TrendDataPoint {
+  date: string;
+  newOrders: number;
+  completed: number;
+  pending: number;
+  total: number;
+}
+
+export interface QueueDistributionItem {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface MedicationVolumeData {
+  name: string;
+  count: number;
+}
+
+export interface PerformanceMetrics {
+  avgProcessingTime: string;
+  completionRate: number;
+  errorRate: number;
+  patientWaitTime: string;
+  queueEfficiency: number;
+  firstTimeAccuracy: number;
+  onTimeCompletion: number;
+  patientSatisfaction: number;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: 'completed' | 'alert' | 'inventory' | 'review';
+  message: string;
+  patient?: string;
+  timestamp: string;
+  status: string;
+  color: 'success' | 'warning' | 'info' | 'error';
+}
+
+export interface MetricCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactElement;
+  trend?: number;
+  color?: 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'error';
+}
+
+export interface PharmacyAnalyticsProps {
+  queueStats: QueueStats;
+  medicationRequests: MedicationRequest[];
+  sx?: SxProps<Theme>;
+}
+
+/**
+ * Helper functions
+ */
+const generateTrendData = (medicationRequests: MedicationRequest[]): TrendDataPoint[] => {
+  const data: TrendDataPoint[] = [];
+  
+  for (let i = 6; i >= 0; i--) {
+    const date = subDays(new Date(), i);
+    const dayRequests = medicationRequests.filter(req => {
+      if (!req.authoredOn) return false;
+      const authoredDate = new Date(req.authoredOn);
+      return startOfDay(authoredDate).getTime() === startOfDay(date).getTime();
+    });
+    
+    data.push({
+      date: format(date, 'MMM dd'),
+      newOrders: Math.floor(Math.random() * 20) + 5, // Mock data
+      completed: Math.floor(Math.random() * 15) + 3,
+      pending: Math.floor(Math.random() * 8) + 2,
+      total: dayRequests.length
+    });
+  }
+  
+  return data;
+};
+
+const calculateMedicationVolume = (medicationRequests: MedicationRequest[]): MedicationVolumeData[] => {
+  const counts: Record<string, number> = {};
+  
+  medicationRequests.forEach(req => {
+    const medName = req.medicationCodeableConcept?.text ||
+                   req.medicationCodeableConcept?.coding?.[0]?.display ||
+                   'Unknown';
+    counts[medName] = (counts[medName] || 0) + 1;
+  });
+  
+  return Object.entries(counts)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+};
+
+const getDefaultPerformanceMetrics = (): PerformanceMetrics => ({
+  avgProcessingTime: '18 min',
+  completionRate: 94.2,
+  errorRate: 0.8,
+  patientWaitTime: '12 min',
+  queueEfficiency: 92,
+  firstTimeAccuracy: 98,
+  onTimeCompletion: 89,
+  patientSatisfaction: 94
+});
+
+const getMockRecentActivity = (): ActivityItem[] => [
+  {
+    id: '1',
+    type: 'completed',
+    message: 'Lisinopril 10mg dispensed',
+    patient: 'John Smith',
+    timestamp: '2 minutes ago',
+    status: 'Completed',
+    color: 'success'
+  },
+  {
+    id: '2',
+    type: 'alert',
+    message: 'Metformin 500mg - drug interaction alert',
+    patient: 'Mary Johnson',
+    timestamp: '5 minutes ago',
+    status: 'Needs Review',
+    color: 'warning'
+  },
+  {
+    id: '3',
+    type: 'inventory',
+    message: 'Inventory low: Simvastatin 20mg',
+    timestamp: '8 minutes ago',
+    status: 'Reorder Needed',
+    color: 'info'
+  }
+];
+
+const formatTrendValue = (trend: number): string => {
+  return `${Math.abs(trend)}% vs last week`;
+};
+
+const getTrendIcon = (trend: number): React.ReactElement => {
+  if (trend > 0) return <UpIcon color="success" fontSize="small" />;
+  if (trend < 0) return <DownIcon color="error" fontSize="small" />;
+  return <FlatIcon color="action" fontSize="small" />;
+};
+
+const getTrendColor = (trend: number): string => {
+  if (trend > 0) return 'success.main';
+  if (trend < 0) return 'error.main';
+  return 'text.secondary';
+};
+
+/**
+ * MetricCard Component
+ */
+const MetricCard: React.FC<MetricCardProps> = ({ 
+  title, 
+  value, 
+  subtitle, 
+  icon, 
+  trend, 
+  color = 'primary' 
+}) => (
+  <Card>
+    <CardContent>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+        <Box>
+          <Typography variant="caption" color="text.secondary">
+            {title}
+          </Typography>
+          <Typography variant="h4" fontWeight="bold" color={`${color}.main`}>
+            {value}
+          </Typography>
+          {subtitle && (
+            <Typography variant="body2" color="text.secondary">
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
+        <Avatar sx={{ bgcolor: `${color}.light` }}>
+          {icon}
+        </Avatar>
+      </Stack>
+      {typeof trend === 'number' && (
+        <Stack direction="row" alignItems="center" spacing={0.5} mt={1}>
+          {getTrendIcon(trend)}
+          <Typography 
+            variant="caption" 
+            color={getTrendColor(trend)}
+          >
+            {formatTrendValue(trend)}
+          </Typography>
+        </Stack>
+      )}
+    </CardContent>
+  </Card>
+);
+
+/**
+ * PharmacyAnalytics Component
+ */
+const PharmacyAnalytics: React.FC<PharmacyAnalyticsProps> = ({ 
+  queueStats, 
+  medicationRequests,
+  sx 
+}) => {
   const theme = useTheme();
 
   // Generate trend data for the last 7 days
-  const trendData = useMemo(() => {
-    const data = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = subDays(new Date(), i);
-      const dayRequests = medicationRequests.filter(req => {
-        const authoredDate = new Date(req.authoredOn);
-        return startOfDay(authoredDate).getTime() === startOfDay(date).getTime();
-      });
-      
-      data.push({
-        date: format(date, 'MMM dd'),
-        newOrders: Math.floor(Math.random() * 20) + 5, // Mock data
-        completed: Math.floor(Math.random() * 15) + 3,
-        pending: Math.floor(Math.random() * 8) + 2,
-        total: dayRequests.length
-      });
-    }
-    return data;
-  }, [medicationRequests]);
+  const trendData = useMemo(() => 
+    generateTrendData(medicationRequests), 
+    [medicationRequests]
+  );
 
   // Queue distribution data
-  const queueDistribution = [
+  const queueDistribution: QueueDistributionItem[] = useMemo(() => [
     { name: 'New Orders', value: queueStats.newOrders, color: theme.palette.warning.main },
     { name: 'Verification', value: queueStats.verification, color: theme.palette.info.main },
     { name: 'Dispensing', value: queueStats.dispensing, color: theme.palette.primary.main },
     { name: 'Ready', value: queueStats.ready, color: theme.palette.success.main }
-  ];
+  ], [queueStats, theme.palette]);
 
   // Top medications by volume
-  const medicationVolume = useMemo(() => {
-    const counts = {};
-    medicationRequests.forEach(req => {
-      const medName = req.medicationCodeableConcept?.text ||
-                     req.medicationCodeableConcept?.coding?.[0]?.display ||
-                     'Unknown';
-      counts[medName] = (counts[medName] || 0) + 1;
-    });
-    
-    return Object.entries(counts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count }));
-  }, [medicationRequests]);
+  const medicationVolume = useMemo(() => 
+    calculateMedicationVolume(medicationRequests), 
+    [medicationRequests]
+  );
 
   // Performance metrics
-  const performanceMetrics = {
-    avgProcessingTime: '18 min', // Mock data
-    completionRate: 94.2,
-    errorRate: 0.8,
-    patientWaitTime: '12 min'
-  };
+  const performanceMetrics = useMemo(() => 
+    getDefaultPerformanceMetrics(), 
+    []
+  );
 
-  const MetricCard = ({ title, value, subtitle, icon, trend, color = 'primary' }) => (
-    <Card>
-      <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              {title}
-            </Typography>
-            <Typography variant="h4" fontWeight="bold" color={`${color}.main`}>
-              {value}
-            </Typography>
-            {subtitle && (
-              <Typography variant="body2" color="text.secondary">
-                {subtitle}
-              </Typography>
-            )}
-          </Box>
-          <Avatar sx={{ bgcolor: `${color}.light` }}>
-            {icon}
-          </Avatar>
-        </Stack>
-        {trend && (
-          <Stack direction="row" alignItems="center" spacing={0.5} mt={1}>
-            {trend > 0 ? (
-              <UpIcon color="success" fontSize="small" />
-            ) : trend < 0 ? (
-              <DownIcon color="error" fontSize="small" />
-            ) : (
-              <FlatIcon color="action" fontSize="small" />
-            )}
-            <Typography 
-              variant="caption" 
-              color={trend > 0 ? 'success.main' : trend < 0 ? 'error.main' : 'text.secondary'}
-            >
-              {Math.abs(trend)}% vs last week
-            </Typography>
-          </Stack>
-        )}
-      </CardContent>
-    </Card>
+  // Recent activity data
+  const recentActivity = useMemo(() => 
+    getMockRecentActivity(), 
+    []
   );
 
   return (
-    <Box>
+    <Box sx={sx}>
       {/* Key Metrics */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={6} md={3}>
@@ -310,11 +471,11 @@ const PharmacyAnalytics = ({ queueStats, medicationRequests }) => {
               <Box>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="body2">Queue Efficiency</Typography>
-                  <Typography variant="body2" fontWeight="bold">92%</Typography>
+                  <Typography variant="body2" fontWeight="bold">{performanceMetrics.queueEfficiency}%</Typography>
                 </Stack>
                 <LinearProgress 
                   variant="determinate" 
-                  value={92} 
+                  value={performanceMetrics.queueEfficiency} 
                   color="success"
                   sx={{ height: 8, borderRadius: 4 }}
                 />
@@ -323,11 +484,11 @@ const PharmacyAnalytics = ({ queueStats, medicationRequests }) => {
               <Box>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="body2">First-Time Accuracy</Typography>
-                  <Typography variant="body2" fontWeight="bold">98%</Typography>
+                  <Typography variant="body2" fontWeight="bold">{performanceMetrics.firstTimeAccuracy}%</Typography>
                 </Stack>
                 <LinearProgress 
                   variant="determinate" 
-                  value={98} 
+                  value={performanceMetrics.firstTimeAccuracy} 
                   color="success"
                   sx={{ height: 8, borderRadius: 4 }}
                 />
@@ -336,11 +497,11 @@ const PharmacyAnalytics = ({ queueStats, medicationRequests }) => {
               <Box>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="body2">On-Time Completion</Typography>
-                  <Typography variant="body2" fontWeight="bold">89%</Typography>
+                  <Typography variant="body2" fontWeight="bold">{performanceMetrics.onTimeCompletion}%</Typography>
                 </Stack>
                 <LinearProgress 
                   variant="determinate" 
-                  value={89} 
+                  value={performanceMetrics.onTimeCompletion} 
                   color="warning"
                   sx={{ height: 8, borderRadius: 4 }}
                 />
@@ -349,11 +510,11 @@ const PharmacyAnalytics = ({ queueStats, medicationRequests }) => {
               <Box>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="body2">Patient Satisfaction</Typography>
-                  <Typography variant="body2" fontWeight="bold">94%</Typography>
+                  <Typography variant="body2" fontWeight="bold">{performanceMetrics.patientSatisfaction}%</Typography>
                 </Stack>
                 <LinearProgress 
                   variant="determinate" 
-                  value={94} 
+                  value={performanceMetrics.patientSatisfaction} 
                   color="success"
                   sx={{ height: 8, borderRadius: 4 }}
                 />
@@ -369,42 +530,23 @@ const PharmacyAnalytics = ({ queueStats, medicationRequests }) => {
               Recent Activity
             </Typography>
             <List>
-              <ListItem>
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: 'success.light' }}>
-                    <PharmacyIcon />
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary="Lisinopril 10mg dispensed"
-                  secondary="Patient: John Smith - 2 minutes ago"
-                />
-                <Chip label="Completed" color="success" size="small" />
-              </ListItem>
-              <ListItem>
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: 'warning.light' }}>
-                    <PharmacyIcon />
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary="Metformin 500mg - drug interaction alert"
-                  secondary="Patient: Mary Johnson - 5 minutes ago"
-                />
-                <Chip label="Needs Review" color="warning" size="small" />
-              </ListItem>
-              <ListItem>
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: 'info.light' }}>
-                    <PharmacyIcon />
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary="Inventory low: Simvastatin 20mg"
-                  secondary="Current stock: 15 units - 8 minutes ago"
-                />
-                <Chip label="Reorder Needed" color="info" size="small" />
-              </ListItem>
+              {recentActivity.map((activity) => (
+                <ListItem key={activity.id}>
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: `${activity.color}.light` }}>
+                      <PharmacyIcon />
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={activity.message}
+                    secondary={activity.patient ? 
+                      `Patient: ${activity.patient} - ${activity.timestamp}` : 
+                      `Current stock: 15 units - ${activity.timestamp}`
+                    }
+                  />
+                  <Chip label={activity.status} color={activity.color} size="small" />
+                </ListItem>
+              ))}
             </List>
           </Paper>
         </Grid>
