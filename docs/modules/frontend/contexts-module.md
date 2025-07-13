@@ -17,6 +17,7 @@ Contexts Module
 ├── AppointmentContext.tsx ✅ (Appointment scheduling) - Migrated
 ├── TaskContext.tsx ✅ (Task management) - Migrated
 ├── DocumentationContext.tsx ✅ (Clinical documentation) - Migrated
+├── OrderContext.tsx ✅ (Clinical ordering & CPOE) - Migrated
 ├── PatientContext.js ⏳ (Current patient state) - Pending
 └── Other contexts... ⏳ - Pending
 ```
@@ -33,6 +34,7 @@ Contexts Module
 | AppointmentContext | ✅ Migrated | 2025-07-12 | FHIR appointment scheduling |
 | TaskContext | ✅ Migrated | 2025-07-12 | Clinical task management |
 | DocumentationContext | ✅ Migrated | 2025-07-12 | Clinical documentation |
+| OrderContext | ✅ Migrated | 2025-07-12 | Clinical ordering & CPOE |
 | PatientContext | ⏳ Pending | - | Current patient state |
 | Others | ⏳ Pending | - | Lower priority contexts |
 
@@ -554,6 +556,95 @@ export type DocumentStatus =
 - ✅ **Real-time integration** with patient resource refresh
 - ✅ **Clinical workflow support** with draft/sign/addendum lifecycle
 
+### OrderContext ✅ **Migrated to TypeScript**
+**Purpose**: Clinical ordering system with FHIR ServiceRequest resources and CPOE (Computerized Physician Order Entry) integration
+
+**Order Management Interface**:
+```typescript
+interface OrderContextType {
+  // Current state
+  activeOrders: TransformedOrder[];
+  pendingOrders: TransformedOrder[];
+  orderSets: OrderSet[];
+  currentOrderAlerts: OrderAlert[];
+  isProcessingOrder: boolean;
+
+  // Order creation
+  createMedicationOrder: (orderDetails: OrderCreationData, overrideAlerts?: boolean) => Promise<{ order?: TransformedOrder; alerts?: OrderAlert[] }>;
+  createLaboratoryOrder: (orderDetails: OrderCreationData) => Promise<{ order: TransformedOrder }>;
+  createImagingOrder: (orderDetails: OrderCreationData) => Promise<{ order: TransformedOrder }>;
+  
+  // Order modification
+  discontinueOrder: (orderId: string, reason?: string) => Promise<void>;
+  modifyOrder: (orderId: string, updates: Partial<OrderCreationData>) => Promise<void>;
+  
+  // Clinical decision support
+  checkDrugInteractions: (order: OrderCreationData) => Promise<OrderAlert[]>;
+}
+```
+
+**Multi-Type Order Support**:
+```typescript
+export type OrderType = 
+  | 'medication' | 'laboratory' | 'imaging' 
+  | 'referral' | 'procedure' | 'other';
+
+export type ServiceRequestStatus = 
+  | 'draft' | 'active' | 'on-hold' | 'revoked' 
+  | 'completed' | 'entered-in-error' | 'unknown';
+
+export type ServiceRequestPriority = 
+  | 'routine' | 'urgent' | 'asap' | 'stat';
+```
+
+**FHIR ServiceRequest Integration**:
+- **Bidirectional Transformation**: Complete FHIR ↔ internal format conversion
+- **Category Mapping**: SNOMED CT codes for different order types
+- **Extensions Support**: Custom medication details, order sets, discontinuation reasons
+- **Status Workflow**: Draft → Active → On-hold → Revoked/Completed lifecycle
+
+**Clinical Decision Support**:
+```typescript
+interface OrderAlert {
+  severity: InteractionSeverity;
+  type: AlertType;
+  message: string;
+  drugs?: string[];
+  clinicalConsequence?: string;
+  management?: string;
+  overridable?: boolean;
+}
+
+export type InteractionSeverity = 'minor' | 'moderate' | 'major' | 'contraindicated';
+export type AlertType = 'drug-drug' | 'drug-allergy' | 'drug-lab' | 'duplicate-therapy';
+```
+
+**Order Sets Management**:
+- **FHIR Questionnaire-Based**: Order sets stored as FHIR Questionnaire resources
+- **Specialty Filtering**: Grouped by medical specialty (cardiology, endocrinology, etc.)
+- **Bulk Ordering**: Apply multiple orders from sets with single operation
+- **Template Support**: Pre-configured order collections with default selections
+
+**Search & Catalog Integration**:
+```typescript
+// External catalog search with type safety
+searchMedications: (query: string) => Promise<MedicationSearchResult[]>;
+searchLaboratoryTests: (query: string) => Promise<LaboratoryTestSearchResult[]>;
+searchImagingStudies: (query: string) => Promise<ImagingStudySearchResult[]>;
+```
+
+**Key Features**:
+- ✅ **FHIR R4 ServiceRequest** with complete resource lifecycle management
+- ✅ **Multi-type ordering** (medication, lab, imaging, referral, procedure)
+- ✅ **Clinical decision support** with drug interaction checking and alerts
+- ✅ **Order sets integration** using FHIR Questionnaire resources
+- ✅ **CPOE workflow** with draft/active/revoked status management
+- ✅ **External catalog search** for medications, lab tests, and imaging
+- ✅ **Priority-based ordering** with routine/urgent/asap/stat classifications
+- ✅ **Type-safe transformations** between FHIR and UI-friendly formats
+- ✅ **Real-time integration** with patient resource refresh
+- ✅ **Medication management** with dosage, route, frequency, duration details
+
 ## Shared Patterns
 
 ### Context Provider Pattern
@@ -831,6 +922,12 @@ Contexts Module
   - Template system and smart phrase expansion
   - Document lifecycle management (draft/save/sign/addendum)
 
+- ✅ **OrderContext** migrated to TypeScript
+  - Clinical ordering system with FHIR ServiceRequest resources
+  - Multi-type order support (medication, lab, imaging, referral, procedure)
+  - Clinical decision support with drug interaction checking
+  - Order sets management using FHIR Questionnaire resources
+
 ### Migration Benefits Achieved
 - **Type Safety**: 100% type coverage in migrated contexts
 - **Developer Experience**: Full IntelliSense and autocomplete
@@ -838,15 +935,19 @@ Contexts Module
 - **Documentation**: Types serve as living documentation
 - **Refactoring**: Safe refactoring with compiler assistance
 
-### Next Steps - Phase 3 Extension
-- Migrate remaining context files in priority order:
+### Next Steps - Phase 3 Extension Complete! 🎉
+- **All Priority Context Files Migrated**:
   - WorkflowContext ✅ (Complete)
   - ClinicalContext ✅ (Complete) 
   - InboxContext ✅ (Complete)
   - AppointmentContext ✅ (Complete)
   - TaskContext ✅ (Complete)
   - DocumentationContext ✅ (Complete)
-  - OrderContext (633 lines) - **Next target**
+  - OrderContext ✅ (Complete) - **Final Migration**
+
+### Phase 4 - Remaining Context Files
+- PatientContext.js - Current patient state management
+- Other lower-priority context files
 - Add comprehensive unit tests for TypeScript contexts
 - Update consuming components to leverage new types
 - Create context composition patterns guide

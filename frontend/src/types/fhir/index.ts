@@ -35,11 +35,23 @@ import {
   IMeasureReport,
   IGroup,
   
+  // Communication for messaging
+  ICommunication,
+  
+  // Appointment scheduling
+  IAppointment,
+  IAppointmentResponse,
+  ISlot,
+  ISchedule,
+  
   // Bundle and search
   IBundle,
   IBundle_Entry,
   BundleTypeKind,
   Bundle_SearchModeKind,
+  
+  // Order sets and questionnaires
+  IQuestionnaire,
   
   // Common data types
   IHumanName,
@@ -88,9 +100,21 @@ export type Coverage = ICoverage;
 // Additional workflow resources
 export type Goal = IGoal;
 export type Task = ITask;
+
+// Order sets and questionnaires
+export type Questionnaire = IQuestionnaire;
 export type Measure = IMeasure;
 export type MeasureReport = IMeasureReport;
 export type Group = IGroup;
+
+// Communication for messaging
+export type Communication = ICommunication;
+
+// Appointment scheduling
+export type Appointment = IAppointment;
+export type AppointmentResponse = IAppointmentResponse;
+export type Slot = ISlot;
+export type Schedule = ISchedule;
 
 // Bundle and search types
 export type Bundle = IBundle;
@@ -148,7 +172,12 @@ export type FHIRResourceType =
   | 'Task'
   | 'Measure'
   | 'MeasureReport'
-  | 'Group';
+  | 'Group'
+  | 'Communication'
+  | 'Appointment'
+  | 'AppointmentResponse'
+  | 'Slot'
+  | 'Schedule';
 
 /**
  * Search parameters interface for FHIR API calls
@@ -301,6 +330,26 @@ export function isEncounter(resource: any): resource is Encounter {
 
 export function isBundle(resource: any): resource is Bundle {
   return resource && resource.resourceType === 'Bundle';
+}
+
+export function isCommunication(resource: any): resource is Communication {
+  return resource && resource.resourceType === 'Communication';
+}
+
+export function isAppointment(resource: any): resource is Appointment {
+  return resource && resource.resourceType === 'Appointment';
+}
+
+export function isAppointmentResponse(resource: any): resource is AppointmentResponse {
+  return resource && resource.resourceType === 'AppointmentResponse';
+}
+
+export function isSlot(resource: any): resource is Slot {
+  return resource && resource.resourceType === 'Slot';
+}
+
+export function isSchedule(resource: any): resource is Schedule {
+  return resource && resource.resourceType === 'Schedule';
 }
 
 /**
