@@ -155,23 +155,7 @@ const SummaryTab = ({ patientId, onNotificationUpdate }) => {
     overdueItems: 0
   });
 
-  // Load all patient data
-  useEffect(() => {
-    loadDashboardData();
-  }, [patientId]);
-
-  // Reload data when resources change
-  useEffect(() => {
-    // Get conditions to check if data has been loaded
-    const conditions = getPatientResources(patientId, 'Condition') || [];
-    
-    // If we previously had no conditions but now have some, reload
-    if (conditions.length > 0 && stats.activeProblems === 0) {
-      loadDashboardData();
-    }
-  }, [getPatientResources, patientId, stats.activeProblems]);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -259,7 +243,23 @@ const SummaryTab = ({ patientId, onNotificationUpdate }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [patientId, getPatientResources, onNotificationUpdate]);
+
+  // Load all patient data
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Reload data when resources change
+  useEffect(() => {
+    // Get conditions to check if data has been loaded
+    const conditions = getPatientResources(patientId, 'Condition') || [];
+    
+    // If we previously had no conditions but now have some, reload
+    if (conditions.length > 0 && stats.activeProblems === 0) {
+      loadDashboardData();
+    }
+  }, [getPatientResources, patientId, stats.activeProblems, loadDashboardData]);
 
 
   const handleRefresh = () => {
