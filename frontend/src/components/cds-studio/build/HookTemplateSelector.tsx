@@ -1,5 +1,7 @@
 /**
  * Hook Template Selector - Pre-built hook templates for common scenarios
+ * 
+ * Migrated to TypeScript with comprehensive type safety for CDS Hook templates.
  */
 
 import React, { useState } from 'react';
@@ -16,7 +18,9 @@ import {
   TextField,
   InputAdornment,
   IconButton,
-  Collapse
+  Collapse,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -26,11 +30,68 @@ import {
   Medication as MedIcon,
   Warning as SafetyIcon,
   Assignment as ComplianceIcon,
-  TrendingUp as QualityIcon
+  TrendingUp as QualityIcon,
 } from '@mui/icons-material';
 
-// Hook templates organized by category
-const HOOK_TEMPLATES = {
+/**
+ * Type definitions for HookTemplateSelector component
+ */
+export type HookType = 'patient-view' | 'medication-prescribe' | 'order-sign' | 'order-select';
+export type CardIndicator = 'info' | 'warning' | 'critical' | 'success';
+export type ConditionOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains';
+export type TemplateCategory = 'clinical' | 'safety' | 'laboratory' | 'preventive' | 'quality';
+
+export interface TemplateCondition {
+  id?: string;
+  field: string;
+  operator: ConditionOperator;
+  value: string | number | boolean;
+}
+
+export interface CardSuggestion {
+  label: string;
+  type: 'create' | 'update' | 'delete';
+  resource?: string;
+}
+
+export interface TemplateCard {
+  id?: string;
+  summary: string;
+  detail: string;
+  indicator: CardIndicator;
+  source?: {
+    label: string;
+    url?: string;
+  };
+  suggestions?: CardSuggestion[];
+}
+
+export interface HookTemplate {
+  id: string;
+  title: string;
+  description: string;
+  hook: HookType;
+  conditions: TemplateCondition[];
+  cards: TemplateCard[];
+}
+
+export interface TemplateCategory {
+  label: string;
+  icon: React.ReactElement;
+  color: string;
+  templates: HookTemplate[];
+}
+
+export interface HookTemplateSelectorProps {
+  onSelectTemplate: (template: HookTemplate) => void;
+  onClose?: () => void;
+  sx?: SxProps<Theme>;
+}
+
+/**
+ * Constants
+ */
+const HOOK_TEMPLATES: Record<TemplateCategory, TemplateCategory> = {
   clinical: {
     label: 'Clinical Guidelines',
     icon: <ClinicalIcon />,
@@ -43,7 +104,7 @@ const HOOK_TEMPLATES = {
         hook: 'patient-view',
         conditions: [
           { field: 'has_condition', operator: 'contains', value: 'Diabetes' },
-          { field: 'hba1c', operator: '>', value: '7' }
+          { field: 'hba1c', operator: '>', value: 7 }
         ],
         cards: [{
           summary: 'Elevated HbA1c - Intervention Needed',
@@ -58,7 +119,7 @@ const HOOK_TEMPLATES = {
         description: 'Alert for uncontrolled blood pressure readings',
         hook: 'patient-view',
         conditions: [
-          { field: 'blood_pressure_systolic', operator: '>=', value: '140' }
+          { field: 'blood_pressure_systolic', operator: '>=', value: 140 }
         ],
         cards: [{
           summary: 'Elevated Blood Pressure',
@@ -129,7 +190,7 @@ const HOOK_TEMPLATES = {
         description: 'Monitor creatinine levels for kidney disease',
         hook: 'patient-view',
         conditions: [
-          { field: 'creatinine', operator: '>', value: '1.5' }
+          { field: 'creatinine', operator: '>', value: 1.5 }
         ],
         cards: [{
           summary: 'Elevated Creatinine',
@@ -150,8 +211,8 @@ const HOOK_TEMPLATES = {
         description: 'Remind about due preventive screenings',
         hook: 'patient-view',
         conditions: [
-          { field: 'age', operator: '>=', value: '50' },
-          { field: 'days_since', operator: '>', value: '365' }
+          { field: 'age', operator: '>=', value: 50 },
+          { field: 'days_since', operator: '>', value: 365 }
         ],
         cards: [{
           summary: 'Preventive Screening Due',
@@ -166,7 +227,7 @@ const HOOK_TEMPLATES = {
         description: 'Alert for due immunizations',
         hook: 'patient-view',
         conditions: [
-          { field: 'days_since', operator: '>', value: '365' }
+          { field: 'days_since', operator: '>', value: 365 }
         ],
         cards: [{
           summary: 'Immunization Due',
@@ -200,50 +261,102 @@ const HOOK_TEMPLATES = {
   }
 };
 
-const HookTemplateSelector = ({ onSelectTemplate, onClose }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
+/**
+ * Helper functions
+ */
+const generateUniqueId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
 
-  const filterTemplates = (templates) => {
-    if (!searchTerm) return templates;
-    
-    const term = searchTerm.toLowerCase();
-    return templates.filter(template => 
-      template.title.toLowerCase().includes(term) ||
-      template.description.toLowerCase().includes(term)
-    );
+const filterTemplates = (templates: HookTemplate[], searchTerm: string): HookTemplate[] => {
+  if (!searchTerm) return templates;
+  
+  const term = searchTerm.toLowerCase();
+  return templates.filter(template => 
+    template.title.toLowerCase().includes(term) ||
+    template.description.toLowerCase().includes(term)
+  );
+};
+
+const createTemplateWithIds = (template: HookTemplate): HookTemplate => {
+  return {
+    ...template,
+    conditions: template.conditions.map(c => ({
+      ...c,
+      id: generateUniqueId()
+    })),
+    cards: template.cards.map(c => ({
+      ...c,
+      id: generateUniqueId()
+    }))
+  };
+};
+
+const getAllTemplates = (categoryFilter?: TemplateCategory | null): HookTemplate[] => {
+  if (categoryFilter) {
+    return HOOK_TEMPLATES[categoryFilter].templates;
+  }
+  
+  return Object.values(HOOK_TEMPLATES).flatMap(category => category.templates);
+};
+
+const hasMatchingTemplates = (searchTerm: string, categoryFilter?: TemplateCategory | null): boolean => {
+  const templates = getAllTemplates(categoryFilter);
+  return filterTemplates(templates, searchTerm).length > 0;
+};
+
+/**
+ * HookTemplateSelector Component
+ */
+const HookTemplateSelector: React.FC<HookTemplateSelectorProps> = ({ 
+  onSelectTemplate, 
+  onClose,
+  sx 
+}) => {
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | null>(null);
+
+  const handleSelectTemplate = (template: HookTemplate): void => {
+    const templateWithIds = createTemplateWithIds(template);
+    onSelectTemplate(templateWithIds);
   };
 
-  const handleSelectTemplate = (template) => {
-    // Create a copy with generated IDs for conditions and cards
-    const templateCopy = {
-      ...template,
-      conditions: template.conditions.map(c => ({
-        ...c,
-        id: `${Date.now()}-${Math.random()}`
-      })),
-      cards: template.cards.map(c => ({
-        ...c,
-        id: `${Date.now()}-${Math.random()}`
-      }))
-    };
-    onSelectTemplate(templateCopy);
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    setSearchTerm(event.target.value);
   };
+
+  const handleCategorySelect = (category: TemplateCategory | null): void => {
+    setSelectedCategory(category);
+  };
+
+  const handleClose = (): void => {
+    if (onClose) {
+      onClose();
+    }
+  };
+
+  const categoriesToShow = selectedCategory 
+    ? { [selectedCategory]: HOOK_TEMPLATES[selectedCategory] }
+    : HOOK_TEMPLATES;
+
+  const hasResults = hasMatchingTemplates(searchTerm, selectedCategory);
 
   return (
-    <Box>
+    <Box sx={sx}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h6">Select a Template</Typography>
-        <IconButton onClick={onClose} size="small">
-          <CloseIcon />
-        </IconButton>
+        {onClose && (
+          <IconButton onClick={handleClose} size="small" aria-label="Close template selector">
+            <CloseIcon />
+          </IconButton>
+        )}
       </Box>
 
       <TextField
         fullWidth
         placeholder="Search templates..."
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={handleSearchChange}
         sx={{ mb: 3 }}
         InputProps={{
           startAdornment: (
@@ -258,15 +371,15 @@ const HookTemplateSelector = ({ onSelectTemplate, onClose }) => {
       <Stack direction="row" spacing={1} sx={{ mb: 3 }} flexWrap="wrap">
         <Chip
           label="All"
-          onClick={() => setSelectedCategory(null)}
+          onClick={() => handleCategorySelect(null)}
           color={selectedCategory === null ? 'primary' : 'default'}
         />
-        {Object.entries(HOOK_TEMPLATES).map(([key, category]) => (
+        {(Object.entries(HOOK_TEMPLATES) as Array<[TemplateCategory, TemplateCategory]>).map(([key, category]) => (
           <Chip
             key={key}
             icon={category.icon}
             label={category.label}
-            onClick={() => setSelectedCategory(key)}
+            onClick={() => handleCategorySelect(key)}
             color={selectedCategory === key ? 'primary' : 'default'}
           />
         ))}
@@ -274,48 +387,53 @@ const HookTemplateSelector = ({ onSelectTemplate, onClose }) => {
 
       {/* Templates Grid */}
       <Grid container spacing={2}>
-        {Object.entries(HOOK_TEMPLATES)
-          .filter(([key]) => !selectedCategory || selectedCategory === key)
-          .map(([categoryKey, category]) => 
-            filterTemplates(category.templates).map(template => (
-              <Grid item xs={12} md={6} key={template.id}>
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={1}>
-                      <Box color={category.color}>
-                        {category.icon}
-                      </Box>
-                      <Typography variant="h6">
-                        {template.title}
-                      </Typography>
+        {Object.entries(categoriesToShow).map(([categoryKey, category]) => 
+          filterTemplates(category.templates, searchTerm).map((template: HookTemplate) => (
+            <Grid item xs={12} md={6} key={template.id}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <Box color={category.color}>
+                      {category.icon}
                     </Box>
-                    
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                      {template.description}
+                    <Typography variant="h6">
+                      {template.title}
                     </Typography>
-                    
-                    <Stack direction="row" spacing={1}>
-                      <Chip label={template.hook} size="small" />
-                      <Chip label={`${template.conditions.length} conditions`} size="small" />
-                      <Chip label={`${template.cards.length} cards`} size="small" />
-                    </Stack>
-                  </CardContent>
+                  </Box>
                   
-                  <CardActions>
-                    <Button 
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    {template.description}
+                  </Typography>
+                  
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Chip label={template.hook} size="small" />
+                    <Chip 
+                      label={`${template.conditions.length} condition${template.conditions.length !== 1 ? 's' : ''}`} 
                       size="small" 
-                      onClick={() => handleSelectTemplate(template)}
-                    >
-                      Use Template
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))
-          )}
+                    />
+                    <Chip 
+                      label={`${template.cards.length} card${template.cards.length !== 1 ? 's' : ''}`} 
+                      size="small" 
+                    />
+                  </Stack>
+                </CardContent>
+                
+                <CardActions>
+                  <Button 
+                    size="small" 
+                    onClick={() => handleSelectTemplate(template)}
+                    aria-label={`Use ${template.title} template`}
+                  >
+                    Use Template
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))
+        )}
       </Grid>
 
-      {Object.values(HOOK_TEMPLATES).every(cat => filterTemplates(cat.templates).length === 0) && (
+      {!hasResults && (
         <Box textAlign="center" py={4}>
           <Typography color="text.secondary">
             No templates found matching "{searchTerm}"
