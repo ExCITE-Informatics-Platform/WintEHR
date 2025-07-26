@@ -4,10 +4,12 @@
 
 > **Important**: For detailed implementation patterns and comprehensive documentation, see [CLAUDE-REFERENCE.md](./CLAUDE-REFERENCE.md)
 
-**Last Updated**: 2025-07-26  
-**Version**: 3.0
+**Last Updated**: 2025-01-26  
+**Version**: 3.1
 
 > **NEW**: Simplified deployment! See [DEPLOYMENT_SIMPLIFIED.md](./DEPLOYMENT_SIMPLIFIED.md) for the new streamlined approach.
+
+> **IMPORTANT**: TypeScript migration in progress! See [TYPESCRIPT_MIGRATION_PLAN.md](./docs/TYPESCRIPT_MIGRATION_PLAN.md) for details. All TypeScript work should be done on the `feature/typescript-migration` branch.
 
 ## 🎯 Project Overview
 
@@ -624,6 +626,12 @@ WintEHR now includes a comprehensive Clinical Design System:
 - **[docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)** - Complete deployment guide
 - **[docs/BUILD_PROCESS_ANALYSIS.md](docs/BUILD_PROCESS_ANALYSIS.md)** - Deep dive into build system
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture overview
+
+### TypeScript Migration (NEW)
+- **[docs/TYPESCRIPT_MIGRATION_PLAN.md](docs/TYPESCRIPT_MIGRATION_PLAN.md)** - Comprehensive migration strategy
+- **[docs/TYPESCRIPT_ARCHITECTURE_GUIDE.md](docs/TYPESCRIPT_ARCHITECTURE_GUIDE.md)** - Modern TypeScript architecture
+- **[docs/TYPESCRIPT_LIBRARY_MIGRATION.md](docs/TYPESCRIPT_LIBRARY_MIGRATION.md)** - Library updates and replacements
+- **Branch**: All TypeScript work on `feature/typescript-migration`
 
 ### Technical References
 - **[docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md)** - API endpoint documentation
