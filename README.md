@@ -381,7 +381,7 @@ pytest            # Backend
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) [Coming soon!] for guidelines.
 
 ### Development Workflow
 
