@@ -20,7 +20,7 @@ We welcome contributions to the WintEHR project! This guide outlines the high-le
 
 ## Quick Links for Detailed Information
 
-*   **Detailed Development Protocols & Standards**: [`CLAUDE.md`](CLAUDE.md)
+*   **Detailed Development Protocols & Standards**: [NEED TO ADD LINK]
 *   **System Architecture**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 *   **Development Environment Setup**: [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md)
 *   **Deployment Guide**: [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)
