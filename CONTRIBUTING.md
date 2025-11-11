@@ -4,9 +4,9 @@ We welcome contributions to the WintEHR project! This guide outlines the high-le
 
 ## How to Contribute
 
-1.  **Understand the Project**: Familiarize yourself with the WintEHR system by reading the main `README.md` and the `docs/ARCHITECTURE.md`.
+1.  **Understand the Project**: Familiarize yourself with the WintEHR system by reading the main `README.md` and the `docs/ARCHITECTURE.md`[NEED TO ADD LINK].
 
-2.  **Set up Your Development Environment**: Follow the instructions in `docs/DEVELOPMENT_GUIDE.md` to get your local environment running.
+2.  **Set up Your Development Environment**: Follow the instructions in `docs/DEVELOPMENT_GUIDE.md`[NEED TO ADD LINK] to get your local environment running.
 
 3.  **Follow Development Protocols**: All development work in this repository adheres to strict protocols for research, implementation, and review. These are detailed in `CLAUDE.md` [NEED TO ADD LINK] under the "Task Management Protocol" and "Critical Development Rules" sections. **It is crucial to read and understand these before starting any work.**
 
@@ -21,9 +21,9 @@ We welcome contributions to the WintEHR project! This guide outlines the high-le
 ## Quick Links for Detailed Information
 
 *   **Detailed Development Protocols & Standards**: [NEED TO ADD LINK]
-*   **System Architecture**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-*   **Development Environment Setup**: [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md)
-*   **Deployment Guide**: [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)
+*   **System Architecture**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) [NEED TO ADD LINK]
+*   **Development Environment Setup**: [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md) [NEED TO ADD LINK]
+*   **Deployment Guide**: [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) [NEED TO ADD LINK]
 *   **Changelog**: [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
